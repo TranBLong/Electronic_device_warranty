@@ -28,17 +28,30 @@ namespace EWarrantySystem.Models
         [Required]
         public byte[] PasswordSalt { get; set; } = Array.Empty<byte>();
 
-        // Admin, Manager, Receptionist, Technician, Customer
+        /// <summary>
+        /// Phân biệt 5 vai trò: "Admin", "Manager", "Receptionist", "Technician", "Customer"[cite: 1, 2, 3, 4]
+        /// </summary>
         [Required, MaxLength(30)]
-        public string Role { get; set; } = "Customer"; 
+        public string Role { get; set; } = "Customer";[cite: 2, 3, 4]
 
         public bool IsActive { get; set; } = true;
+
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
-        // Navigation Properties (Quan hệ EF Core)
+        // ============================================================
+        // NAVIGATION PROPERTIES (Quan hệ CSDL trong Entity Framework)[cite: 2]
+        // ============================================================
+
+        // Danh sách thiết bị sở hữu (Dành cho Customer)[cite: 2, 3]
         public ICollection<Product> Products { get; set; } = new List<Product>();
-        public ICollection<WarrantyTicket> CustomerTickets { get; set; } = new List<WarrantyTicket>();
-        public ICollection<WarrantyTicket> ReceptionistTickets { get; set; } = new List<WarrantyTicket>();
-        public ICollection<WarrantyTicket> TechnicianTickets { get; set; } = new List<WarrantyTicket>();
+
+        // Danh sách phiếu yêu cầu sửa chữa (Dành cho Customer)[cite: 2, 3]
+        public ICollection<RepairRequest> CustomerRequests { get; set; } = new List<RepairRequest>();
+
+        // Danh sách phiếu đã tiếp nhận (Dành cho Receptionist)[cite: 2, 3]
+        public ICollection<RepairRequest> ReceptionistRequests { get; set; } = new List<RepairRequest>();
+
+        // Danh sách phiếu được giao sửa chữa (Dành cho Technician)[cite: 2, 3]
+        public ICollection<RepairRequest> TechnicianRequests { get; set; } = new List<RepairRequest>();
     }
 }
