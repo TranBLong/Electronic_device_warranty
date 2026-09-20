@@ -32,11 +32,11 @@ namespace EWarrantySystem.Models
         /// Phân biệt 5 vai trò: "Admin", "Manager", "Receptionist", "Technician", "Customer"[cite: 1, 2, 3, 4]
         /// </summary>
         [Required, MaxLength(30)]
-        public string Role { get; set; } = "Customer";[cite: 2, 3, 4]
-
+        public string Role { get; set; } = "Customer";
         public bool IsActive { get; set; } = true;
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime? UpdatedAt { get; set; }
 
         // ============================================================
         // NAVIGATION PROPERTIES (Quan hệ CSDL trong Entity Framework)[cite: 2]
