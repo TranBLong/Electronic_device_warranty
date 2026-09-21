@@ -32,19 +32,16 @@ namespace EWarrantySystem.Models
         [ForeignKey(nameof(ProductId))]
         public Product? Product { get; set; }
 
-        // Khách hàng gửi yêu cầu[cite: 2, 3]
+        // Khách hàng gửi yêu cầu
         public int CustomerId { get; set; }
-        [ForeignKey(nameof(CustomerId))]
         public User? Customer { get; set; }
 
-        // Nhân viên tiếp nhận (Có thể null nếu khách tự gửi online)[cite: 2, 3]
+        // Nhân viên tiếp nhận (Có thể null nếu khách tự gửi online)
         public int? ReceptionistId { get; set; }
-        [ForeignKey(nameof(ReceptionistId))]
         public User? Receptionist { get; set; }
 
-        // Kỹ thuật viên phụ trách sửa chữa (Null trước khi được phân công)[cite: 2, 3]
+        // Kỹ thuật viên phụ trách sửa chữa (Null trước khi được phân công)
         public int? TechnicianId { get; set; }
-        [ForeignKey(nameof(TechnicianId))]
         public User? Technician { get; set; }
     }
 }

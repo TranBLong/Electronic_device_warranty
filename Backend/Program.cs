@@ -41,7 +41,8 @@ builder.Services.AddSwaggerGen(c =>
 
 // DbContext
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseInMemoryDatabase("WarrantyDb"));
+    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection") 
+        ?? "Server=.\\SQLEXPRESS;Database=WarrantyDb;Trusted_Connection=True;TrustServerCertificate=True;"));
 
 // ===== JWT Authentication =====
 var jwtKey = builder.Configuration["Jwt:Key"] 
