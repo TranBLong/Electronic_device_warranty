@@ -41,6 +41,7 @@ namespace EWarrantySystem.DTOs
             /// Vai trò của người dùng trong hệ thống: Admin, Manager, Receptionist, Technician, Customer.
             /// Mặc định khi khách hàng tự đăng ký là "Customer".
             /// </summary>
+            [Required(ErrorMessage = "Vai trò không được để trống")]
             [RegularExpression("^(Admin|Manager|Receptionist|Technician|Customer)$", ErrorMessage = "Vai trò không hợp lệ (Admin, Manager, Receptionist, Technician, Customer)")]
             public string Role { get; set; } = "Customer";
         }
