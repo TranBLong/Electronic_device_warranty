@@ -1,8 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using EWarrantySystem.Models;
 using static EWarrantySystem.DTOs.RepairRequestDtos;
-using EWarrantySystem.Data; // <-- THÊM DÒNG NÀY
+using EWarrantySystem.Data;
 
 namespace EWarrantySystem.Controllers
 {
@@ -175,47 +176,36 @@ namespace EWarrantySystem.Controllers
         /// (Dành cho Lễ tân / Manager thực hiện)
         /// </summary>
         [HttpPut("{id:int}/assign")]
+        [Authorize(Roles = "Admin,Manager,Receptionist")]
         public async Task<IActionResult> AssignTechnician(int id, [FromBody] RepairRequestAssignDto request)
         {
             var repairRequest = await _context.RepairRequests.FindAsync(id);
             if (repairRequest == null)
-            {
                 return NotFound(new { message = $"Không tìm thấy phiếu sửa chữa có Id = {id}" });
-            }
 
-            // Kiểm tra Kỹ thuật viên (TechnicianId) có tồn tại và đúng vai trò không
             var technician = await _context.Users.FindAsync(request.TechnicianId);
             if (technician == null)
-            {
                 return BadRequest(new { message = $"Không tìm thấy người dùng có TechnicianId = {request.TechnicianId}!" });
-            }
 
-            if (!technician.Role.Equals("Technician", StringComparison.OrdinalIgnoreCase) && 
-                !technician.Role.Equals("Admin", StringComparison.OrdinalIgnoreCase) && 
-                !technician.Role.Equals("Manager", StringComparison.OrdinalIgnoreCase))
+            // ===== CHỈ CHẤP NHẬN ROLE = Technician =====
+            if (!technician.Role.Equals("Technician", StringComparison.OrdinalIgnoreCase))
             {
                 return BadRequest(new { message = $"Người dùng ID = {request.TechnicianId} không phải là Kỹ thuật viên!" });
             }
 
-            // Phân công kỹ thuật viên
             repairRequest.TechnicianId = request.TechnicianId;
 
-            // Nếu phiếu đang ở trạng thái Pending thì tự động chuyển sang InProgress
             if (repairRequest.Status == RepairStatusEnum.Pending)
-            {
                 repairRequest.Status = RepairStatusEnum.InProgress;
-            }
 
             await _context.SaveChangesAsync();
 
-            // Load đầy đủ thông tin để trả về Response
+            // Load lại navigation...
             await _context.Entry(repairRequest).Reference(r => r.Product).LoadAsync();
             await _context.Entry(repairRequest).Reference(r => r.Customer).LoadAsync();
             await _context.Entry(repairRequest).Reference(r => r.Technician).LoadAsync();
             if (repairRequest.ReceptionistId.HasValue)
-            {
                 await _context.Entry(repairRequest).Reference(r => r.Receptionist).LoadAsync();
-            }
 
             return Ok(new
             {
@@ -229,6 +219,7 @@ namespace EWarrantySystem.Controllers
         /// (Dành cho Kỹ thuật viên thực hiện)
         /// </summary>
         [HttpPut("{id:int}/status")]
+        [Authorize(Roles = "Admin,Manager,Technician")]
         public async Task<IActionResult> UpdateStatus(int id, [FromBody] RepairRequestUpdateStatusDto request)
         {
             var repairRequest = await _context.RepairRequests.FindAsync(id);
@@ -287,6 +278,7 @@ namespace EWarrantySystem.Controllers
         /// API 7: XÓA PHIẾU SỬA CHỮA
         /// </summary>
         [HttpDelete("{id:int}")]
+        [Authorize(Roles = "Admin,Manager")]
         public async Task<IActionResult> Delete(int id)
         {
             var repairRequest = await _context.RepairRequests.FindAsync(id);

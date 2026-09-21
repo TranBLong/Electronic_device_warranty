@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using EWarrantySystem.Models;
 using static EWarrantySystem.DTOs.WarrantyCardDtos;
 using EWarrantySystem.Data; // <-- THÊM DÒNG NÀY
+using Microsoft.AspNetCore.Authorization;
 
 namespace EWarrantySystem.Controllers
 {

@@ -1,73 +1,70 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Cryptography;
 using System.Text;
 using EWarrantySystem.Models;
 using static EWarrantySystem.DTOs.UserDtos;
 using EWarrantySystem.Data;
+using EWarrantySystem.Services;
 
 namespace EWarrantySystem.Controllers
 {
     [ApiController]
-    [Route("api/[controller]")] // Route: /api/users
+    [Route("api/[controller]")]
     public class UsersController : ControllerBase
     {
         private readonly AppDbContext _context;
+        private readonly JwtTokenService _jwtTokenService;
 
-        public UsersController(AppDbContext context)
+        public UsersController(AppDbContext context, JwtTokenService jwtTokenService)
         {
             _context = context;
+            _jwtTokenService = jwtTokenService;
         }
 
-        /// <summary>
-        /// API 1: LẤY DANH SÁCH TẤT CẢ NGƯỜI DÙNG (Có lọc theo Role / IsActive)
-        /// </summary>
+        // GET: api/users  → chỉ Admin / Manager
         [HttpGet]
+        [Authorize(Roles = "Admin,Manager")]
         public async Task<IActionResult> GetAll([FromQuery] string? role, [FromQuery] bool? isActive)
         {
             var query = _context.Users.AsQueryable();
 
             if (!string.IsNullOrEmpty(role))
-            {
                 query = query.Where(u => u.Role.ToLower() == role.ToLower());
-            }
 
             if (isActive.HasValue)
-            {
                 query = query.Where(u => u.IsActive == isActive.Value);
-            }
 
             var users = await query.ToListAsync();
             var response = users.Select(MapToResponseDto).ToList();
-
             return Ok(response);
         }
 
-        /// <summary>
-        /// API 2: LẤY THÔNG TIN 1 NGƯỜI DÙNG THEO ID
-        /// </summary>
+        // GET: api/users/{id}
         [HttpGet("{id:int}")]
+        [Authorize]
         public async Task<IActionResult> GetById(int id)
         {
             var user = await _context.Users.FindAsync(id);
-
             if (user == null)
-            {
                 return NotFound(new { message = $"Không tìm thấy người dùng có Id = {id}" });
-            }
-
             return Ok(MapToResponseDto(user));
         }
 
-        /// <summary>
-        /// API 3: ĐĂNG KÝ / TẠO MỚI NGƯỜI DÙNG
-        /// </summary>
+        // POST: api/users/register  → Public
         [HttpPost("register")]
+        [AllowAnonymous]
         public async Task<IActionResult> Register([FromBody] UserRegisterDto request)
         {
             if (await _context.Users.AnyAsync(u => u.Username.ToLower() == request.Username.ToLower()))
-            {
                 return BadRequest(new { message = "Tên đăng nhập đã tồn tại!" });
+
+            // Chỉ cho phép đăng ký Role = Customer (trừ khi đã login Admin)
+            var roleToAssign = "Customer";
+            if (User.Identity?.IsAuthenticated == true && User.IsInRole("Admin"))
+            {
+                roleToAssign = string.IsNullOrEmpty(request.Role) ? "Customer" : request.Role;
             }
 
             CreatePasswordHash(request.Password, out byte[] passwordHash, out byte[] passwordSalt);
@@ -80,7 +77,7 @@ namespace EWarrantySystem.Controllers
                 PhoneNumber = request.PhoneNumber,
                 PasswordHash = passwordHash,
                 PasswordSalt = passwordSalt,
-                Role = string.IsNullOrEmpty(request.Role) ? "Customer" : request.Role,
+                Role = roleToAssign,
                 IsActive = true,
                 CreatedAt = DateTime.UtcNow
             };
@@ -88,85 +85,66 @@ namespace EWarrantySystem.Controllers
             _context.Users.Add(newUser);
             await _context.SaveChangesAsync();
 
-            var response = MapToResponseDto(newUser);
-            return CreatedAtAction(nameof(GetById), new { id = newUser.Id }, response);
+            return CreatedAtAction(nameof(GetById), new { id = newUser.Id }, MapToResponseDto(newUser));
         }
 
-        /// <summary>
-        /// API 4: ĐĂNG NHẬP
-        /// </summary>
+        // POST: api/users/login  → Public, trả về JWT
         [HttpPost("login")]
+        [AllowAnonymous]
         public async Task<IActionResult> Login([FromBody] UserLoginDto request)
         {
-            var user = await _context.Users.FirstOrDefaultAsync(u => u.Username.ToLower() == request.Username.ToLower());
+            var user = await _context.Users
+                .FirstOrDefaultAsync(u => u.Username.ToLower() == request.Username.ToLower());
 
             if (user == null)
-            {
                 return BadRequest(new { message = "Tên đăng nhập không tồn tại!" });
-            }
 
             if (!user.IsActive)
-            {
                 return BadRequest(new { message = "Tài khoản hiện đang bị khóa!" });
-            }
 
             if (!VerifyPasswordHash(request.Password, user.PasswordHash, user.PasswordSalt))
-            {
                 return BadRequest(new { message = "Mật khẩu không chính xác!" });
-            }
 
-            var response = MapToResponseDto(user);
+            var token = _jwtTokenService.GenerateToken(user);
+
             return Ok(new
             {
                 message = "Đăng nhập thành công!",
-                user = response
+                token = token,
+                user = MapToResponseDto(user)
             });
         }
 
-        /// <summary>
-        /// API 5: CẬP NHẬT THÔNG TIN CÁ NHÂN (PROFILE)
-        /// </summary>
+        // PUT: api/users/{id}/profile
         [HttpPut("{id:int}/profile")]
+        [Authorize]
         public async Task<IActionResult> UpdateProfile(int id, [FromBody] UserUpdateProfileDto request)
         {
             var user = await _context.Users.FindAsync(id);
-
             if (user == null)
-            {
                 return NotFound(new { message = $"Không tìm thấy người dùng có Id = {id}" });
-            }
 
             user.FullName = request.FullName;
             user.Email = request.Email;
             user.PhoneNumber = request.PhoneNumber;
             user.UpdatedAt = DateTime.UtcNow;
-
             await _context.SaveChangesAsync();
 
-            return Ok(new
-            {
-                message = "Cập nhật thông tin thành công!",
-                user = MapToResponseDto(user)
-            });
+            return Ok(new { message = "Cập nhật thông tin thành công!", user = MapToResponseDto(user) });
         }
 
-        /// <summary>
-        /// API 6: PHÂN QUYỀN / ĐỔI TRẠNG THÁI TÀI KHOẢN (Admin / Manager)
-        /// </summary>
+        // PUT: api/users/role-status  → chỉ Admin / Manager
         [HttpPut("role-status")]
+        [Authorize(Roles = "Admin,Manager")]
         public async Task<IActionResult> UpdateRoleAndStatus([FromBody] UserUpdateRoleDto request)
         {
             var user = await _context.Users.FindAsync(request.UserId);
-
             if (user == null)
-            {
                 return NotFound(new { message = $"Không tìm thấy người dùng có Id = {request.UserId}" });
-            }
 
             user.Role = request.Role;
             user.IsActive = request.IsActive;
             user.UpdatedAt = DateTime.UtcNow;
-
             await _context.SaveChangesAsync();
 
             return Ok(new
@@ -176,56 +154,41 @@ namespace EWarrantySystem.Controllers
             });
         }
 
-        /// <summary>
-        /// API 7: ĐỔI MẬT KHẨU
-        /// </summary>
+        // PUT: api/users/{id}/change-password
         [HttpPut("{id:int}/change-password")]
+        [Authorize]
         public async Task<IActionResult> ChangePassword(int id, [FromBody] ChangePasswordDto request)
         {
             var user = await _context.Users.FindAsync(id);
-
             if (user == null)
-            {
                 return NotFound(new { message = $"Không tìm thấy người dùng có Id = {id}" });
-            }
 
             if (!VerifyPasswordHash(request.OldPassword, user.PasswordHash, user.PasswordSalt))
-            {
                 return BadRequest(new { message = "Mật khẩu cũ không chính xác!" });
-            }
 
             CreatePasswordHash(request.NewPassword, out byte[] newHash, out byte[] newSalt);
             user.PasswordHash = newHash;
             user.PasswordSalt = newSalt;
             user.UpdatedAt = DateTime.UtcNow;
-
             await _context.SaveChangesAsync();
 
             return Ok(new { message = "Đổi mật khẩu thành công!" });
         }
 
-        /// <summary>
-        /// API 8: XÓA MỀM / KHÓA TÀI KHOẢN NGƯỜI DÙNG THEO ID
-        /// </summary>
+        // DELETE: api/users/{id}  → chỉ Admin / Manager
         [HttpDelete("{id:int}")]
+        [Authorize(Roles = "Admin,Manager")]
         public async Task<IActionResult> Delete(int id)
         {
             var user = await _context.Users.FindAsync(id);
-
             if (user == null)
-            {
                 return NotFound(new { message = $"Không tìm thấy người dùng có Id = {id}" });
-            }
 
             if (!user.IsActive)
-            {
                 return BadRequest(new { message = $"Tài khoản có Id = {id} đã bị khóa trước đó!" });
-            }
 
-            // Xóa mềm: Khóa tài khoản thay vì xóa hẳn bản ghi khỏi CSDL
             user.IsActive = false;
             user.UpdatedAt = DateTime.UtcNow;
-
             await _context.SaveChangesAsync();
 
             return Ok(new
@@ -235,8 +198,7 @@ namespace EWarrantySystem.Controllers
             });
         }
 
-        #region --- HÀM BỔ TRỢ BẢO MẬT & CHUYỂN ĐỔI DTO ---
-
+        #region --- HÀM BỔ TRỢ ---
         private static void CreatePasswordHash(string password, out byte[] passwordHash, out byte[] passwordSalt)
         {
             using var hmac = new HMACSHA512();
@@ -266,7 +228,6 @@ namespace EWarrantySystem.Controllers
                 UpdatedAt = user.UpdatedAt
             };
         }
-
         #endregion
     }
 }

@@ -204,3 +204,5 @@ D:\FileBaiTap\Ky7\Web2\Code\Electronic_device\Backend\obj\Debug\net10.0\swae.bui
 D:\FileBaiTap\Ky7\Web2\Code\Electronic_device\Backend\obj\Debug\net10.0\Electron.6F81A14F.Up2Date
 D:\FileBaiTap\Ky7\Web2\Code\Electronic_device\Backend\obj\Debug\net10.0\Electronic_device.genruntimeconfig.cache
 D:\FileBaiTap\Ky7\Web2\Code\Electronic_device\Backend\obj\Debug\net10.0\ref\Electronic_device.dll
+D:\FileBaiTap\Ky7\Web2\Code\Electronic_device\Backend\bin\Debug\net10.0\Microsoft.AspNetCore.Authentication.JwtBearer.dll
+D:\FileBaiTap\Ky7\Web2\Code\Electronic_device\Backend\bin\Debug\net10.0\Microsoft.Bcl.Cryptography.dll
