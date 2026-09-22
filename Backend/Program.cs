@@ -5,12 +5,17 @@ using EWarrantySystem.Models;
 using Microsoft.OpenApi;
 using System.Text;
 using EWarrantySystem.Data;
+using EWarrantySystem.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // 1. Đăng ký dịch vụ
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddScoped<IProductService, ProductService>();
+builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<IRepairRequestService, RepairRequestService>();
+builder.Services.AddScoped<IWarrantyCardService, WarrantyCardService>();
 
 // Swagger hỗ trợ JWT Bearer
 builder.Services.AddSwaggerGen(c =>

@@ -2,8 +2,9 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using EWarrantySystem.Models;
-using static EWarrantySystem.DTOs.RepairRequestDtos;
 using EWarrantySystem.Data;
+using EWarrantySystem.DTOs;
+using EWarrantySystem.Services;
 
 namespace EWarrantySystem.Controllers
 {
@@ -12,10 +13,12 @@ namespace EWarrantySystem.Controllers
     public class RepairRequestsController : ControllerBase
     {
         private readonly AppDbContext _context;
+        private readonly IRepairRequestService _repairRequestService;
 
-        public RepairRequestsController(AppDbContext context)
+        public RepairRequestsController(AppDbContext context, IRepairRequestService repairRequestService)
         {
             _context = context;
+            _repairRequestService = repairRequestService;
         }
 
         /// <summary>
@@ -26,8 +29,13 @@ namespace EWarrantySystem.Controllers
             [FromQuery] int? customerId, 
             [FromQuery] int? technicianId, 
             [FromQuery] string? status, 
-            [FromQuery] string? search)
+            [FromQuery] string? search,
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 10)
         {
+            if (page < 1) page = 1;
+            if (pageSize < 1 || pageSize > 100) pageSize = 10;
+
             var query = _context.RepairRequests
                 .Include(r => r.Product)
                 .Include(r => r.Customer)
@@ -61,10 +69,24 @@ namespace EWarrantySystem.Controllers
                                          r.IssueDescription.ToLower().Contains(keyword));
             }
 
-            var requests = await query.OrderByDescending(r => r.CreatedAt).ToListAsync();
+            var totalCount = await query.CountAsync();
+
+            var requests = await query
+                .OrderByDescending(r => r.Id)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
             var responseList = requests.Select(MapToResponseDto).ToList();
 
-            return Ok(responseList);
+            return Ok(new
+            {
+                totalCount,
+                page,
+                pageSize,
+                totalPages = (int)Math.Ceiling(totalCount / (double)pageSize),
+                data = responseList
+            });
         }
 
         /// <summary>
@@ -116,59 +138,12 @@ namespace EWarrantySystem.Controllers
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] RepairRequestCreateDto request)
         {
-            // 1. Kiểm tra Thiết bị (Product) có tồn tại trong hệ thống không
-            var product = await _context.Products.FindAsync(request.ProductId);
-            if (product == null)
-            {
-                return BadRequest(new { message = $"Không tìm thấy thiết bị có ProductId = {request.ProductId}!" });
-            }
+            var result = await _repairRequestService.CreateAsync(request);
 
-            // 2. Kiểm tra Khách hàng (Customer) có tồn tại không
-            var customer = await _context.Users.FindAsync(request.CustomerId);
-            if (customer == null)
-            {
-                return BadRequest(new { message = $"Không tìm thấy khách hàng có CustomerId = {request.CustomerId}!" });
-            }
+            if (!result.Success)
+                return BadRequest(new { message = result.ErrorMessage });
 
-            // 3. Nếu có ReceptionistId, kiểm tra nhân viên Lễ tân có tồn tại không
-            if (request.ReceptionistId.HasValue)
-            {
-                var receptionistExists = await _context.Users.AnyAsync(u => u.Id == request.ReceptionistId.Value);
-                if (!receptionistExists)
-                {
-                    return BadRequest(new { message = $"Không tìm thấy lễ tân có ReceptionistId = {request.ReceptionistId.Value}!" });
-                }
-            }
-
-            // 4. Sinh tự động Mã phiếu (ví dụ: REQ-20260921-1234)
-            string generatedCode = $"REQ-{DateTime.UtcNow:yyyyMMdd}-{Random.Shared.Next(1000, 9999)}";
-
-            // 5. Khởi tạo thực thể RepairRequest
-            var newRequest = new RepairRequest
-            {
-                RequestCode = generatedCode,
-                IssueDescription = request.IssueDescription.Trim(),
-                ProductId = request.ProductId,
-                CustomerId = request.CustomerId,
-                ReceptionistId = request.ReceptionistId,
-                Status = RepairStatusEnum.Pending, // Trạng thái ban đầu là Pending (Chờ tiếp nhận)
-                CreatedAt = DateTime.UtcNow
-            };
-
-            _context.RepairRequests.Add(newRequest);
-            await _context.SaveChangesAsync();
-
-            // 6. Load lại các Navigation Properties để trả về DTO đầy đủ
-            await _context.Entry(newRequest).Reference(r => r.Product).LoadAsync();
-            await _context.Entry(newRequest).Reference(r => r.Customer).LoadAsync();
-            if (newRequest.ReceptionistId.HasValue)
-            {
-                await _context.Entry(newRequest).Reference(r => r.Receptionist).LoadAsync();
-            }
-
-            var responseDto = MapToResponseDto(newRequest);
-
-            return CreatedAtAction(nameof(GetById), new { id = newRequest.Id }, responseDto);
+            return CreatedAtAction(nameof(GetById), new { id = result.Data!.Id }, result.Data);
         }
 
         /// <summary>
@@ -179,38 +154,20 @@ namespace EWarrantySystem.Controllers
         [Authorize(Roles = "Admin,Manager,Receptionist")]
         public async Task<IActionResult> AssignTechnician(int id, [FromBody] RepairRequestAssignDto request)
         {
-            var repairRequest = await _context.RepairRequests.FindAsync(id);
-            if (repairRequest == null)
-                return NotFound(new { message = $"Không tìm thấy phiếu sửa chữa có Id = {id}" });
+            var result = await _repairRequestService.AssignTechnicianAsync(id, request);
 
-            var technician = await _context.Users.FindAsync(request.TechnicianId);
-            if (technician == null)
-                return BadRequest(new { message = $"Không tìm thấy người dùng có TechnicianId = {request.TechnicianId}!" });
-
-            // ===== CHỈ CHẤP NHẬN ROLE = Technician =====
-            if (!technician.Role.Equals("Technician", StringComparison.OrdinalIgnoreCase))
+            if (!result.Success)
             {
-                return BadRequest(new { message = $"Người dùng ID = {request.TechnicianId} không phải là Kỹ thuật viên!" });
+                if (result.ErrorMessage!.Contains("Không tìm thấy phiếu"))
+                    return NotFound(new { message = result.ErrorMessage });
+
+                return BadRequest(new { message = result.ErrorMessage });
             }
-
-            repairRequest.TechnicianId = request.TechnicianId;
-
-            if (repairRequest.Status == RepairStatusEnum.Pending)
-                repairRequest.Status = RepairStatusEnum.InProgress;
-
-            await _context.SaveChangesAsync();
-
-            // Load lại navigation...
-            await _context.Entry(repairRequest).Reference(r => r.Product).LoadAsync();
-            await _context.Entry(repairRequest).Reference(r => r.Customer).LoadAsync();
-            await _context.Entry(repairRequest).Reference(r => r.Technician).LoadAsync();
-            if (repairRequest.ReceptionistId.HasValue)
-                await _context.Entry(repairRequest).Reference(r => r.Receptionist).LoadAsync();
 
             return Ok(new
             {
-                message = $"Đã phân công Kỹ thuật viên '{technician.FullName}' cho phiếu {repairRequest.RequestCode} thành công!",
-                repairRequest = MapToResponseDto(repairRequest)
+                message = $"Đã phân công Kỹ thuật viên cho phiếu {result.Data!.RequestCode} thành công!",
+                repairRequest = result.Data
             });
         }
 
@@ -222,55 +179,20 @@ namespace EWarrantySystem.Controllers
         [Authorize(Roles = "Admin,Manager,Technician")]
         public async Task<IActionResult> UpdateStatus(int id, [FromBody] RepairRequestUpdateStatusDto request)
         {
-            var repairRequest = await _context.RepairRequests.FindAsync(id);
-            if (repairRequest == null)
-            {
-                return NotFound(new { message = $"Không tìm thấy phiếu sửa chữa có Id = {id}" });
-            }
+            var result = await _repairRequestService.UpdateStatusAsync(id, request);
 
-            // Chuyển đổi chuỗi Status sang RepairStatusEnum
-            if (!Enum.TryParse<RepairStatusEnum>(request.Status, true, out var newStatus))
+            if (!result.Success)
             {
-                return BadRequest(new { message = $"Trạng thái '{request.Status}' không hợp lệ! (Chấp nhận: Pending, InProgress, Completed, Returned, Cancelled)" });
-            }
+                if (result.ErrorMessage!.Contains("Không tìm thấy phiếu"))
+                    return NotFound(new { message = result.ErrorMessage });
 
-            // Cập nhật thông tin
-            repairRequest.Status = newStatus;
-
-            if (!string.IsNullOrWhiteSpace(request.TechnicalNote))
-            {
-                repairRequest.TechnicalNote = request.TechnicalNote.Trim();
-            }
-
-            if (request.EstimatedReturnDate.HasValue)
-            {
-                repairRequest.EstimatedReturnDate = request.EstimatedReturnDate.Value;
-            }
-
-            // Nếu trạng thái đổi sang Completed hoặc Returned thì cập nhật CompletedAt
-            if ((newStatus == RepairStatusEnum.Completed || newStatus == RepairStatusEnum.Returned) && !repairRequest.CompletedAt.HasValue)
-            {
-                repairRequest.CompletedAt = DateTime.UtcNow;
-            }
-
-            await _context.SaveChangesAsync();
-
-            // Load thông tin trả về
-            await _context.Entry(repairRequest).Reference(r => r.Product).LoadAsync();
-            await _context.Entry(repairRequest).Reference(r => r.Customer).LoadAsync();
-            if (repairRequest.TechnicianId.HasValue)
-            {
-                await _context.Entry(repairRequest).Reference(r => r.Technician).LoadAsync();
-            }
-            if (repairRequest.ReceptionistId.HasValue)
-            {
-                await _context.Entry(repairRequest).Reference(r => r.Receptionist).LoadAsync();
+                return BadRequest(new { message = result.ErrorMessage });
             }
 
             return Ok(new
             {
                 message = "Cập nhật tiến độ sửa chữa thành công!",
-                repairRequest = MapToResponseDto(repairRequest)
+                repairRequest = result.Data
             });
         }
 
@@ -281,14 +203,10 @@ namespace EWarrantySystem.Controllers
         [Authorize(Roles = "Admin,Manager")]
         public async Task<IActionResult> Delete(int id)
         {
-            var repairRequest = await _context.RepairRequests.FindAsync(id);
-            if (repairRequest == null)
-            {
-                return NotFound(new { message = $"Không tìm thấy phiếu sửa chữa có Id = {id}" });
-            }
+            var result = await _repairRequestService.DeleteAsync(id);
 
-            _context.RepairRequests.Remove(repairRequest);
-            await _context.SaveChangesAsync();
+            if (!result.Success)
+                return NotFound(new { message = result.ErrorMessage });
 
             return NoContent();
         }

@@ -1,9 +1,10 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using EWarrantySystem.Models;
-using static EWarrantySystem.DTOs.WarrantyCardDtos;
-using EWarrantySystem.Data; // <-- THÊM DÒNG NÀY
+using EWarrantySystem.Data;
 using Microsoft.AspNetCore.Authorization;
+using EWarrantySystem.DTOs;
+using EWarrantySystem.Services;
 
 namespace EWarrantySystem.Controllers
 {
@@ -12,18 +13,29 @@ namespace EWarrantySystem.Controllers
     public class WarrantyCardsController : ControllerBase
     {
         private readonly AppDbContext _context;
+        private readonly IWarrantyCardService _warrantyCardService;
 
-        public WarrantyCardsController(AppDbContext context)
+        public WarrantyCardsController(AppDbContext context, IWarrantyCardService warrantyCardService)
         {
             _context = context;
+            _warrantyCardService = warrantyCardService;
         }
 
         /// <summary>
         /// API 1: LẤY DANH SÁCH TẤT CẢ THẺ BẢO HÀNH (Có hỗ trợ lọc theo ProductId hoặc trạng thái)
         /// </summary>
         [HttpGet]
-        public async Task<IActionResult> GetAll([FromQuery] int? productId, [FromQuery] bool? isActive, [FromQuery] string? searchCode)
+        public async Task<IActionResult> GetAll(
+            [FromQuery] int? productId,
+            [FromQuery] bool? isActive,
+            [FromQuery] string? searchCode,
+            [FromQuery] string? search,
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 10)
         {
+            if (page < 1) page = 1;
+            if (pageSize < 1 || pageSize > 100) pageSize = 10;
+
             var query = _context.WarrantyCards
                 .Include(w => w.Product)
                     .ThenInclude(p => p!.Customer)
@@ -42,16 +54,31 @@ namespace EWarrantySystem.Controllers
             }
 
             // Tìm kiếm theo Mã thẻ bảo hành
-            if (!string.IsNullOrWhiteSpace(searchCode))
+            var searchKey = !string.IsNullOrWhiteSpace(search) ? search : searchCode;
+            if (!string.IsNullOrWhiteSpace(searchKey))
             {
-                var keyword = searchCode.Trim().ToLower();
+                var keyword = searchKey.Trim().ToLower();
                 query = query.Where(w => w.CardCode.ToLower().Contains(keyword));
             }
 
-            var cards = await query.ToListAsync();
+            var totalCount = await query.CountAsync();
+
+            var cards = await query
+                .OrderByDescending(w => w.Id)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
             var responseList = cards.Select(MapToResponseDto).ToList();
 
-            return Ok(responseList);
+            return Ok(new
+            {
+                totalCount,
+                page,
+                pageSize,
+                totalPages = (int)Math.Ceiling(totalCount / (double)pageSize),
+                data = responseList
+            });
         }
 
         /// <summary>
@@ -98,63 +125,12 @@ namespace EWarrantySystem.Controllers
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] WarrantyCardCreateDto request)
         {
-            // 1. Kiểm tra Thiết bị (Product) có tồn tại trong hệ thống không
-            var product = await _context.Products.FindAsync(request.ProductId);
-            if (product == null)
-            {
-                return BadRequest(new { message = $"Không tìm thấy thiết bị với ProductId = {request.ProductId}!" });
-            }
+            var result = await _warrantyCardService.CreateAsync(request);
 
-            // 2. Kiểm tra xem Thiết bị đã có Thẻ bảo hành chưa (Quan hệ 1-1)
-            var existingCardForProduct = await _context.WarrantyCards
-                .AnyAsync(w => w.ProductId == request.ProductId);
-            if (existingCardForProduct)
-            {
-                return BadRequest(new { message = $"Thiết bị (ID: {request.ProductId}) đã được đính kèm một thẻ bảo hành khác!" });
-            }
+            if (!result.Success)
+                return BadRequest(new { message = result.ErrorMessage });
 
-            // 3. Kiểm tra Mã thẻ bảo hành (CardCode) có bị trùng lặp không
-            var cardCodeExists = await _context.WarrantyCards
-                .AnyAsync(w => w.CardCode.ToLower() == request.CardCode.Trim().ToLower());
-            if (cardCodeExists)
-            {
-                return BadRequest(new { message = $"Mã thẻ bảo hành '{request.CardCode}' đã tồn tại trên hệ thống!" });
-            }
-
-            // 4. Kiểm tra logic Ngày bắt đầu và Ngày kết thúc
-            if (request.EndDate <= request.StartDate)
-            {
-                return BadRequest(new { message = "Ngày hết hạn bảo hành (EndDate) phải sau ngày bắt đầu (StartDate)!" });
-            }
-
-            // 5. Khởi tạo thực thể WarrantyCard
-            var newCard = new WarrantyCard
-            {
-                CardCode = request.CardCode.Trim(),
-                StartDate = request.StartDate,
-                EndDate = request.EndDate,
-                WarrantyType = string.IsNullOrWhiteSpace(request.WarrantyType) ? "Standard" : request.WarrantyType.Trim(),
-                IsActive = request.IsActive,
-                ProductId = request.ProductId
-            };
-
-            _context.WarrantyCards.Add(newCard);
-            await _context.SaveChangesAsync();
-
-            // 6. Load dữ liệu liên quan để map sang ResponseDto
-            await _context.Entry(newCard)
-                .Reference(w => w.Product)
-                .LoadAsync();
-            if (newCard.Product != null)
-            {
-                await _context.Entry(newCard.Product)
-                    .Reference(p => p.Customer)
-                    .LoadAsync();
-            }
-
-            var responseDto = MapToResponseDto(newCard);
-
-            return CreatedAtAction(nameof(GetById), new { id = newCard.Id }, responseDto);
+            return CreatedAtAction(nameof(GetById), new { id = result.Data!.Id }, result.Data);
         }
 
         /// <summary>
@@ -163,33 +139,20 @@ namespace EWarrantySystem.Controllers
         [HttpPut("{id:int}")]
         public async Task<IActionResult> Update(int id, [FromBody] WarrantyCardUpdateDto request)
         {
-            var card = await _context.WarrantyCards
-                .Include(w => w.Product)
-                    .ThenInclude(p => p!.Customer)
-                .FirstOrDefaultAsync(w => w.Id == id);
+            var result = await _warrantyCardService.UpdateAsync(id, request);
 
-            if (card == null)
+            if (!result.Success)
             {
-                return NotFound(new { message = $"Không tìm thấy thẻ bảo hành có Id = {id}" });
+                if (result.ErrorMessage!.Contains("Không tìm thấy thẻ"))
+                    return NotFound(new { message = result.ErrorMessage });
+
+                return BadRequest(new { message = result.ErrorMessage });
             }
-
-            // Kiểm tra Ngày hết hạn hợp lệ so với Ngày bắt đầu hiện tại
-            if (request.EndDate <= card.StartDate)
-            {
-                return BadRequest(new { message = "Ngày hết hạn mới phải sau ngày bắt đầu kích hoạt thẻ!" });
-            }
-
-            // Cập nhật thông tin
-            card.EndDate = request.EndDate;
-            card.WarrantyType = request.WarrantyType.Trim();
-            card.IsActive = request.IsActive;
-
-            await _context.SaveChangesAsync();
 
             return Ok(new
             {
                 message = "Cập nhật thông tin thẻ bảo hành thành công!",
-                warrantyCard = MapToResponseDto(card)
+                warrantyCard = result.Data
             });
         }
 
@@ -199,15 +162,10 @@ namespace EWarrantySystem.Controllers
         [HttpDelete("{id:int}")]
         public async Task<IActionResult> Delete(int id)
         {
-            var card = await _context.WarrantyCards.FindAsync(id);
+            var result = await _warrantyCardService.DeleteAsync(id);
 
-            if (card == null)
-            {
-                return NotFound(new { message = $"Không tìm thấy thẻ bảo hành có Id = {id}" });
-            }
-
-            _context.WarrantyCards.Remove(card);
-            await _context.SaveChangesAsync();
+            if (!result.Success)
+                return NotFound(new { message = result.ErrorMessage });
 
             return NoContent();
         }

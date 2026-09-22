@@ -206,3 +206,4 @@ D:\FileBaiTap\Ky7\Web2\Code\Electronic_device\Backend\obj\Debug\net10.0\Electron
 D:\FileBaiTap\Ky7\Web2\Code\Electronic_device\Backend\obj\Debug\net10.0\ref\Electronic_device.dll
 D:\FileBaiTap\Ky7\Web2\Code\Electronic_device\Backend\bin\Debug\net10.0\Microsoft.AspNetCore.Authentication.JwtBearer.dll
 D:\FileBaiTap\Ky7\Web2\Code\Electronic_device\Backend\bin\Debug\net10.0\Microsoft.Bcl.Cryptography.dll
+D:\FileBaiTap\Ky7\Web2\Code\Electronic_device\Backend\bin\Debug\net10.0\BCrypt-Net-Next.dll

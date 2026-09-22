@@ -1,9 +1,10 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using EWarrantySystem.Models;
-using static EWarrantySystem.DTOs.ProductDtos;
-using EWarrantySystem.Data; // <-- THÊM DÒNG NÀY
+using EWarrantySystem.Data;
 using Microsoft.AspNetCore.Authorization;
+using EWarrantySystem.DTOs;
+using EWarrantySystem.Services;
 
 namespace EWarrantySystem.Controllers
 {
@@ -12,42 +13,61 @@ namespace EWarrantySystem.Controllers
     public class ProductsController : ControllerBase
     {
         private readonly AppDbContext _context;
+        private readonly IProductService _productService;
 
-        public ProductsController(AppDbContext context)
+        public ProductsController(AppDbContext context, IProductService productService)
         {
             _context = context;
+            _productService = productService;
         }
 
         /// <summary>
         /// API 1: LẤY DANH SÁCH TẤT CẢ THIẾT BỊ (Có hỗ trợ lọc theo CustomerId hoặc Tìm kiếm)
         /// </summary>
         [HttpGet]
-        public async Task<IActionResult> GetAll([FromQuery] int? customerId, [FromQuery] string? search)
+        public async Task<IActionResult> GetAll(
+            [FromQuery] int? customerId,
+            [FromQuery] string? search,
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 10)
         {
+            if (page < 1) page = 1;
+            if (pageSize < 1 || pageSize > 100) pageSize = 10;
+
             var query = _context.Products
                 .Include(p => p.Customer)
                 .Include(p => p.WarrantyCard)
                 .AsQueryable();
 
-            // Lọc theo mã khách hàng nếu có
             if (customerId.HasValue && customerId.Value > 0)
-            {
                 query = query.Where(p => p.CustomerId == customerId.Value);
-            }
 
-            // Tìm kiếm theo tên hoặc mã Serial/IMEI
             if (!string.IsNullOrWhiteSpace(search))
             {
                 var keyword = search.Trim().ToLower();
-                query = query.Where(p => p.Name.ToLower().Contains(keyword) || 
+                query = query.Where(p => p.Name.ToLower().Contains(keyword) ||
                                          p.SerialNumber.ToLower().Contains(keyword) ||
                                          p.Model.ToLower().Contains(keyword));
             }
 
-            var products = await query.ToListAsync();
+            var totalCount = await query.CountAsync();
+
+            var products = await query
+                .OrderByDescending(p => p.Id)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
             var responseList = products.Select(MapToResponseDto).ToList();
 
-            return Ok(responseList);
+            return Ok(new
+            {
+                totalCount,
+                page,
+                pageSize,
+                totalPages = (int)Math.Ceiling(totalCount / (double)pageSize),
+                data = responseList
+            });
         }
 
         /// <summary>
@@ -94,40 +114,12 @@ namespace EWarrantySystem.Controllers
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] ProductCreateDto request)
         {
-            // 1. Kiểm tra Khách hàng sở hữu có tồn tại trong hệ thống không
-            var customerExists = await _context.Users.AnyAsync(u => u.Id == request.CustomerId);
-            if (!customerExists)
-            {
-                return BadRequest(new { message = $"Khách hàng sở hữu với CustomerId = {request.CustomerId} không tồn tại!" });
-            }
+            var result = await _productService.CreateAsync(request);
 
-            // 2. Kiểm tra mã Serial/IMEI có bị trùng lặp không
-            var serialExists = await _context.Products.AnyAsync(p => p.SerialNumber.ToLower() == request.SerialNumber.Trim().ToLower());
-            if (serialExists)
-            {
-                return BadRequest(new { message = $"Mã Serial/IMEI '{request.SerialNumber}' đã tồn tại trên hệ thống!" });
-            }
+            if (!result.Success)
+                return BadRequest(new { message = result.ErrorMessage });
 
-            // 3. Khởi tạo thực thể Product mới
-            var newProduct = new Product
-            {
-                SerialNumber = request.SerialNumber.Trim(),
-                Name = request.Name.Trim(),
-                Model = request.Model?.Trim() ?? string.Empty,
-                Brand = request.Brand?.Trim() ?? string.Empty,
-                PurchaseDate = request.PurchaseDate,
-                CustomerId = request.CustomerId
-            };
-
-            _context.Products.Add(newProduct);
-            await _context.SaveChangesAsync();
-
-            // 4. Load lại dữ liệu bao gồm Customer và WarrantyCard để map DTO phản hồi
-            await _context.Entry(newProduct).Reference(p => p.Customer).LoadAsync();
-
-            var responseDto = MapToResponseDto(newProduct);
-
-            return CreatedAtAction(nameof(GetById), new { id = newProduct.Id }, responseDto);
+            return CreatedAtAction(nameof(GetById), new { id = result.Data!.Id }, result.Data);
         }
 
         /// <summary>
