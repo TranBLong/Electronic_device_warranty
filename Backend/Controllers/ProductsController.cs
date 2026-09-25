@@ -10,6 +10,7 @@ namespace EWarrantySystem.Controllers
 {
     [ApiController]
     [Route("api/[controller]")] // Route: /api/products
+    [Authorize]
     public class ProductsController : ControllerBase
     {
         private readonly AppDbContext _context;

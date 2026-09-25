@@ -25,6 +25,7 @@ namespace EWarrantySystem.Controllers
         /// API 1: LẤY DANH SÁCH TẤT CẢ PHIẾU SỬA CHỮA (Có lọc theo CustomerId, TechnicianId, Status, Keyword)
         /// </summary>
         [HttpGet]
+        [Authorize]
         public async Task<IActionResult> GetAll(
             [FromQuery] int? customerId, 
             [FromQuery] int? technicianId, 
@@ -42,6 +43,17 @@ namespace EWarrantySystem.Controllers
                 .Include(r => r.Receptionist)
                 .Include(r => r.Technician)
                 .AsQueryable();
+
+            var role = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value;
+            if (role == "Customer")
+            {
+                var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+                if (string.IsNullOrEmpty(userIdClaim) || !int.TryParse(userIdClaim, out var currentUserId))
+                    return Unauthorized(new { message = "Token không hợp lệ." });
+
+                // Customer chỉ được xem phiếu của chính mình.
+                query = query.Where(r => r.CustomerId == currentUserId);
+            }
 
             // Lọc theo Khách hàng
             if (customerId.HasValue && customerId.Value > 0)
@@ -93,14 +105,28 @@ namespace EWarrantySystem.Controllers
         /// API 2: LẤY THÔNG TIN CHI TIẾT PHIẾU SỬA CHỮA THEO ID
         /// </summary>
         [HttpGet("{id:int}")]
+        [Authorize]
         public async Task<IActionResult> GetById(int id)
         {
-            var request = await _context.RepairRequests
+            var query = _context.RepairRequests
                 .Include(r => r.Product)
                 .Include(r => r.Customer)
                 .Include(r => r.Receptionist)
                 .Include(r => r.Technician)
-                .FirstOrDefaultAsync(r => r.Id == id);
+                .AsQueryable();
+
+            var role = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value;
+            if (role == "Customer")
+            {
+                var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+                if (string.IsNullOrEmpty(userIdClaim) || !int.TryParse(userIdClaim, out var currentUserId))
+                    return Unauthorized(new { message = "Token không hợp lệ." });
+
+                // Customer không được xem phiếu của khách hàng khác.
+                query = query.Where(r => r.CustomerId == currentUserId);
+            }
+
+            var request = await query.FirstOrDefaultAsync(r => r.Id == id);
 
             if (request == null)
             {
@@ -136,8 +162,29 @@ namespace EWarrantySystem.Controllers
         /// (Dành cho Khách hàng tạo online hoặc Lễ tân tạo tại quầy)
         /// </summary>
         [HttpPost]
+        [Authorize]
         public async Task<IActionResult> Create([FromBody] RepairRequestCreateDto request)
         {
+            var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userIdClaim) || !int.TryParse(userIdClaim, out var currentUserId))
+                return Unauthorized(new { message = "Token không hợp lệ." });
+
+            var role = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value;
+            if (role == "Customer")
+            {
+                // Không tin CustomerId do client gửi lên.
+                request.CustomerId = currentUserId;
+            }
+            else if (role is "Admin" or "Manager" or "Receptionist")
+            {
+                if (request.ReceptionistId == null)
+                    request.ReceptionistId = currentUserId;
+            }
+            else
+            {
+                return Forbid();
+            }
+
             var result = await _repairRequestService.CreateAsync(request);
 
             if (!result.Success)

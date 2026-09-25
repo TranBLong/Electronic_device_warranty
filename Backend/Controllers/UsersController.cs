@@ -76,6 +76,14 @@ namespace EWarrantySystem.Controllers
         [Authorize]
         public async Task<IActionResult> GetById(int id)
         {
+            var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userIdClaim) || !int.TryParse(userIdClaim, out var currentUserId))
+                return Unauthorized();
+
+            // Chỉ Admin/Manager hoặc chính chủ mới được xem thông tin.
+            if (!User.IsInRole("Admin") && !User.IsInRole("Manager") && currentUserId != id)
+                return Forbid();
+
             var user = await _context.Users.FindAsync(id);
             if (user == null)
                 return NotFound(new { message = $"Không tìm thấy người dùng có Id = {id}" });
@@ -119,6 +127,14 @@ namespace EWarrantySystem.Controllers
         [Authorize]
         public async Task<IActionResult> UpdateProfile(int id, [FromBody] UserUpdateProfileDto request)
         {
+            var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userIdClaim) || !int.TryParse(userIdClaim, out var currentUserId))
+                return Unauthorized();
+
+            // Chỉ Admin/Manager hoặc chính chủ mới được cập nhật hồ sơ.
+            if (!User.IsInRole("Admin") && !User.IsInRole("Manager") && currentUserId != id)
+                return Forbid();
+
             var result = await _userService.UpdateProfileAsync(id, request);
 
             if (!result.Success)
@@ -149,6 +165,14 @@ namespace EWarrantySystem.Controllers
         [Authorize]
         public async Task<IActionResult> ChangePassword(int id, [FromBody] ChangePasswordDto request)
         {
+            var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userIdClaim) || !int.TryParse(userIdClaim, out var currentUserId))
+                return Unauthorized();
+
+            // Đổi mật khẩu chỉ dành cho chính chủ, kể cả Admin/Manager.
+            if (currentUserId != id)
+                return Forbid();
+
             var result = await _userService.ChangePasswordAsync(id, request);
 
             if (!result.Success)

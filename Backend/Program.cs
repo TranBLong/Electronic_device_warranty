@@ -10,7 +10,15 @@ using EWarrantySystem.Services;
 var builder = WebApplication.CreateBuilder(args);
 
 // 1. Đăng ký dịch vụ
-builder.Services.AddControllers();
+builder.Services.AddControllers(options =>
+{
+    var policy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .Build();
+
+    options.Filters.Add(
+        new Microsoft.AspNetCore.Mvc.Authorization.AuthorizeFilter(policy));
+});
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddScoped<IProductService, ProductService>();
 builder.Services.AddScoped<IUserService, UserService>();
