@@ -25,9 +25,6 @@ namespace EWarrantySystem.Models
         [Required]
         public byte[] PasswordHash { get; set; } = Array.Empty<byte>();
 
-        [Required]
-        public byte[] PasswordSalt { get; set; } = Array.Empty<byte>();
-
         /// <summary>
         /// Phân biệt 5 vai trò: "Admin", "Manager", "Receptionist", "Technician", "Customer"[cite: 1, 2, 3, 4]
         /// </summary>

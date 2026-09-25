@@ -81,9 +81,48 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 builder.Services.AddAuthorization();
 builder.Services.AddScoped<EWarrantySystem.Services.JwtTokenService>();
 
+// ===== CORS =====
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowFrontend", policy =>
+    {
+        policy.WithOrigins(
+                "http://localhost:3000",   // React / Next dev
+                "http://localhost:5173",   // Vite
+                "http://localhost:4200"    // Angular (nếu dùng)
+            )
+            .AllowAnyHeader()
+            .AllowAnyMethod()
+            .AllowCredentials();
+    });
+});
+
 var app = builder.Build();
 
-// 2. Middleware
+// Global exception handling — phải đứng trước các middleware khác
+app.UseExceptionHandler(errorApp =>
+{
+    errorApp.Run(async context =>
+    {
+        context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+        context.Response.ContentType = "application/json";
+
+        var exceptionFeature = context.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>();
+        var error = exceptionFeature?.Error;
+
+        // Production: không lộ stack trace
+        var message = app.Environment.IsDevelopment()
+            ? error?.ToString()
+            : "Đã xảy ra lỗi hệ thống. Vui lòng thử lại sau.";
+
+        await context.Response.WriteAsJsonAsync(new
+        {
+            status = 500,
+            message
+        });
+    });
+});
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -92,7 +131,9 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-app.UseAuthentication(); // Bắt buộc trước UseAuthorization
+app.UseCors("AllowFrontend");
+
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();

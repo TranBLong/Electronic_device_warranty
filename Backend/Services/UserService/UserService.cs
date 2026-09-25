@@ -40,7 +40,6 @@ namespace EWarrantySystem.Services
                 Email = request.Email,
                 PhoneNumber = request.PhoneNumber,
                 PasswordHash = Encoding.UTF8.GetBytes(HashPassword(request.Password)),
-                PasswordSalt = Array.Empty<byte>(),
                 Role = roleToAssign,
                 IsActive = true,
                 CreatedAt = DateTime.UtcNow
@@ -106,7 +105,6 @@ namespace EWarrantySystem.Services
                 return (false, "Mật khẩu cũ không chính xác!");
 
             user.PasswordHash = Encoding.UTF8.GetBytes(HashPassword(request.NewPassword));
-            user.PasswordSalt = Array.Empty<byte>();
             user.UpdatedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();

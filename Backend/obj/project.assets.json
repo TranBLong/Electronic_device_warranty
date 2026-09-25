@@ -3810,11 +3810,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "D:\\FileBaiTap\\Ky7\\3tc\\Web2\\Code\\Electronic_device\\Backend\\Electronic_device.csproj",
+      "projectUniqueName": "D:\\FileBaiTap\\Ky7\\3tc\\Web2\\Code\\Electronic_device\\backend\\Electronic_device.csproj",
       "projectName": "Electronic_device",
-      "projectPath": "D:\\FileBaiTap\\Ky7\\3tc\\Web2\\Code\\Electronic_device\\Backend\\Electronic_device.csproj",
+      "projectPath": "D:\\FileBaiTap\\Ky7\\3tc\\Web2\\Code\\Electronic_device\\backend\\Electronic_device.csproj",
       "packagesPath": "C:\\Users\\ASUS\\.nuget\\packages\\",
-      "outputPath": "D:\\FileBaiTap\\Ky7\\3tc\\Web2\\Code\\Electronic_device\\Backend\\obj\\",
+      "outputPath": "D:\\FileBaiTap\\Ky7\\3tc\\Web2\\Code\\Electronic_device\\backend\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
         "C:\\Users\\ASUS\\AppData\\Roaming\\NuGet\\NuGet.Config"
