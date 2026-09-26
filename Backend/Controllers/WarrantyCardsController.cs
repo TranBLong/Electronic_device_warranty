@@ -124,6 +124,7 @@ namespace EWarrantySystem.Controllers
         /// API 4: TẠO MỚI / KÍCH HOẠT THẺ BẢO HÀNH (WarrantyCardCreateDto)
         /// </summary>
         [HttpPost]
+        [Authorize(Roles = "Admin,Manager,Receptionist")]
         public async Task<IActionResult> Create([FromBody] WarrantyCardCreateDto request)
         {
             var result = await _warrantyCardService.CreateAsync(request);
@@ -138,6 +139,7 @@ namespace EWarrantySystem.Controllers
         /// API 5: GIA HẠN / ĐỔI LOẠI / CẬP NHẬT TRẠNG THÁI THẺ (WarrantyCardUpdateDto)
         /// </summary>
         [HttpPut("{id:int}")]
+        [Authorize(Roles = "Admin,Manager,Receptionist")]
         public async Task<IActionResult> Update(int id, [FromBody] WarrantyCardUpdateDto request)
         {
             var result = await _warrantyCardService.UpdateAsync(id, request);
@@ -161,6 +163,7 @@ namespace EWarrantySystem.Controllers
         /// API 6: VÔ HIỆU HÓA / XÓA THẺ BẢO HÀNH
         /// </summary>
         [HttpDelete("{id:int}")]
+        [Authorize(Roles = "Admin,Manager,Receptionist")]
         public async Task<IActionResult> Delete(int id)
         {
             var result = await _warrantyCardService.DeleteAsync(id);

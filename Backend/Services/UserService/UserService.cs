@@ -113,6 +113,27 @@ namespace EWarrantySystem.Services
             return (true, null, newAccess, newRefresh, MapToResponseDto(stored.User));
         }
 
+        // ==================== LOGOUT ====================
+        public async Task<(bool Success, string? ErrorMessage)> LogoutAsync(string refreshToken)
+        {
+            if (string.IsNullOrWhiteSpace(refreshToken))
+                return (false, "Refresh token không được để trống!");
+
+            var stored = await _context.RefreshTokens
+                .FirstOrDefaultAsync(t => t.Token == refreshToken);
+
+            if (stored == null)
+                return (false, "Refresh token không hợp lệ!");
+
+            if (stored.RevokedAt != null)
+                return (true, null); // đã revoke rồi → coi như thành công
+
+            stored.RevokedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+
+            return (true, null);
+        }
+
         // ==================== UPDATE PROFILE ====================
         public async Task<(bool Success, string? ErrorMessage, UserResponseDto? Data)> UpdateProfileAsync(
             int id, 

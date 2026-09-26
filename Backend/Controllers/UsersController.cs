@@ -141,6 +141,19 @@ namespace EWarrantySystem.Controllers
             });
         }
 
+        // POST: api/users/logout
+        [HttpPost("logout")]
+        [AllowAnonymous]
+        public async Task<IActionResult> Logout([FromBody] RefreshTokenDto request)
+        {
+            var result = await _userService.LogoutAsync(request.RefreshToken);
+
+            if (!result.Success)
+                return BadRequest(new { message = result.ErrorMessage });
+
+            return Ok(new { message = "Đăng xuất thành công!" });
+        }
+
         // PUT: api/users/{id}/profile
         [HttpPut("{id:int}/profile")]
         [Authorize]

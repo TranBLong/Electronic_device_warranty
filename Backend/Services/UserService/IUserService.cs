@@ -14,6 +14,8 @@ namespace EWarrantySystem.Services
         Task<(bool Success, string? ErrorMessage, string? AccessToken, string? RefreshToken, UserResponseDto? Data)> RefreshTokenAsync(
             string refreshToken);
 
+        Task<(bool Success, string? ErrorMessage)> LogoutAsync(string refreshToken);
+
         Task<(bool Success, string? ErrorMessage, UserResponseDto? Data)> UpdateProfileAsync(
             int id, 
             UserUpdateProfileDto request);

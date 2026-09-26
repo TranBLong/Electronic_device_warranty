@@ -113,6 +113,7 @@ namespace EWarrantySystem.Controllers
         /// API 4: TẠO MỚI THIẾT BỊ (ProductCreateDto)
         /// </summary>
         [HttpPost]
+        [Authorize(Roles = "Admin,Manager,Receptionist")]
         public async Task<IActionResult> Create([FromBody] ProductCreateDto request)
         {
             var result = await _productService.CreateAsync(request);
@@ -127,6 +128,7 @@ namespace EWarrantySystem.Controllers
         /// API 5: CẬP NHẬT THÔNG TIN THIẾT BỊ (ProductUpdateDto)
         /// </summary>
         [HttpPut("{id:int}")]
+        [Authorize(Roles = "Admin,Manager,Receptionist")]
         public async Task<IActionResult> Update(int id, [FromBody] ProductUpdateDto request)
         {
             var product = await _context.Products
@@ -185,6 +187,7 @@ namespace EWarrantySystem.Controllers
         /// API 6: XÓA THIẾT BỊ
         /// </summary>
         [HttpDelete("{id:int}")]
+        [Authorize(Roles = "Admin,Manager,Receptionist")]
         public async Task<IActionResult> Delete(int id)
         {
             var product = await _context.Products.FindAsync(id);
