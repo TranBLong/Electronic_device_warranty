@@ -169,9 +169,14 @@ namespace EWarrantySystem.Controllers
             var result = await _warrantyCardService.DeleteAsync(id);
 
             if (!result.Success)
-                return NotFound(new { message = result.ErrorMessage });
+            {
+                if (result.ErrorMessage!.Contains("Không tìm thấy"))
+                    return NotFound(new { message = result.ErrorMessage });
 
-            return NoContent();
+                return BadRequest(new { message = result.ErrorMessage });
+            }
+
+            return Ok(new { message = $"Vô hiệu hóa thẻ bảo hành có Id = {id} thành công!" });
         }
 
         #region --- HÀM BỔ TRỢ CHUYỂN ĐỔI DTO ---

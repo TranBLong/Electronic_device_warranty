@@ -100,7 +100,10 @@ namespace EWarrantySystem.Services
             if (card == null)
                 return (false, $"Không tìm thấy thẻ bảo hành có Id = {id}");
 
-            _context.WarrantyCards.Remove(card);
+            if (!card.IsActive)
+                return (false, $"Thẻ bảo hành có Id = {id} đã bị vô hiệu hóa trước đó!");
+
+            card.IsActive = false;
             await _context.SaveChangesAsync();
 
             return (true, null);
