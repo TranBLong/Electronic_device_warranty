@@ -163,7 +163,9 @@ namespace EWarrantySystem.Controllers
         /// </summary>
         [HttpPost]
         [Authorize]
-        public async Task<IActionResult> Create([FromBody] RepairRequestCreateDto request)
+        [RequestSizeLimit(5_000_000)] // 5MB
+        [Consumes("multipart/form-data")]
+        public async Task<IActionResult> Create([FromForm] RepairRequestCreateDto request)
         {
             var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userIdClaim) || !int.TryParse(userIdClaim, out var currentUserId))
@@ -185,7 +187,26 @@ namespace EWarrantySystem.Controllers
                 return Forbid();
             }
 
-            var result = await _repairRequestService.CreateAsync(request);
+            string? imageUrl = null;
+            if (request.EvidenceImage != null && request.EvidenceImage.Length > 0)
+            {
+                var allowed = new[] { ".jpg", ".jpeg", ".png", ".webp" };
+                var ext = Path.GetExtension(request.EvidenceImage.FileName).ToLowerInvariant();
+                if (!allowed.Contains(ext))
+                    return BadRequest(new { message = "Chỉ chấp nhận ảnh jpg/png/webp" });
+
+                var folder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads", "repair");
+                Directory.CreateDirectory(folder);
+                var fileName = $"{Guid.NewGuid()}{ext}";
+                var path = Path.Combine(folder, fileName);
+
+                await using (var stream = System.IO.File.Create(path))
+                    await request.EvidenceImage.CopyToAsync(stream);
+
+                imageUrl = $"/uploads/repair/{fileName}";
+            }
+
+            var result = await _repairRequestService.CreateAsync(request, imageUrl);
 
             if (!result.Success)
                 return BadRequest(new { message = result.ErrorMessage });
@@ -331,7 +352,9 @@ namespace EWarrantySystem.Controllers
 
                 // Thông tin Kỹ thuật viên
                 TechnicianId = request.TechnicianId,
-                TechnicianName = request.Technician?.FullName
+                TechnicianName = request.Technician?.FullName,
+
+                EvidenceImageUrl = request.EvidenceImageUrl
             };
         }
 

@@ -24,6 +24,7 @@ bld/
 project.lock.json
 project.fragment.lock.json
 artifacts/
+logs/
 
 ## IDE / OS
 .vs/

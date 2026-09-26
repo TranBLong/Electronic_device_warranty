@@ -6,136 +6,166 @@ using Microsoft.OpenApi;
 using System.Text;
 using EWarrantySystem.Data;
 using EWarrantySystem.Services;
+using EWarrantySystem.Validators;
+using FluentValidation;
+using FluentValidation.AspNetCore;
+using Serilog;
 
-var builder = WebApplication.CreateBuilder(args);
+Log.Logger = new LoggerConfiguration()
+    .WriteTo.Console()
+    .WriteTo.File("logs/ewarranty-.log", rollingInterval: RollingInterval.Day)
+    .Enrich.FromLogContext()
+    .CreateLogger();
 
-// 1. Đăng ký dịch vụ
-builder.Services.AddControllers(options =>
+try
 {
-    var policy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder()
-        .RequireAuthenticatedUser()
-        .Build();
+    var builder = WebApplication.CreateBuilder(args);
+    builder.Host.UseSerilog();
 
-    options.Filters.Add(
-        new Microsoft.AspNetCore.Mvc.Authorization.AuthorizeFilter(policy));
-});
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddScoped<IProductService, ProductService>();
-builder.Services.AddScoped<IUserService, UserService>();
-builder.Services.AddScoped<IRepairRequestService, RepairRequestService>();
-builder.Services.AddScoped<IWarrantyCardService, WarrantyCardService>();
-
-// Swagger hỗ trợ JWT Bearer
-builder.Services.AddSwaggerGen(c =>
-{
-    c.SwaggerDoc("v1", new OpenApiInfo { Title = "EWarrantySystem API", Version = "v1" });
-
-    var securityScheme = new OpenApiSecurityScheme
+    // 1. Đăng ký dịch vụ
+    builder.Services.AddControllers(options =>
     {
-        Name = "Authorization",
-        Description = "Nhập JWT token theo dạng: Bearer {token}",
-        In = ParameterLocation.Header,
-        Type = SecuritySchemeType.Http,
-        Scheme = "bearer",
-        BearerFormat = "JWT"
-    };
+        var policy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder()
+            .RequireAuthenticatedUser()
+            .Build();
 
-    c.AddSecurityDefinition("Bearer", securityScheme);
-
-    // Sửa thành lambda function: _ => new OpenApiSecurityRequirement
-    c.AddSecurityRequirement(_ => new OpenApiSecurityRequirement
-    {
-        {
-            new OpenApiSecuritySchemeReference("Bearer"),
-            new List<string>()
-        }
+        options.Filters.Add(
+            new Microsoft.AspNetCore.Mvc.Authorization.AuthorizeFilter(policy));
     });
-});
+    builder.Services.AddEndpointsApiExplorer();
+    builder.Services.AddScoped<IProductService, ProductService>();
+    builder.Services.AddScoped<IUserService, UserService>();
+    builder.Services.AddScoped<IRepairRequestService, RepairRequestService>();
+    builder.Services.AddScoped<IWarrantyCardService, WarrantyCardService>();
 
-// DbContext
-builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+    builder.Services.AddFluentValidationAutoValidation();
+    builder.Services.AddValidatorsFromAssemblyContaining<RepairRequestCreateDtoValidator>();
+    builder.Services.AddScoped<IEmailService, EmailService>();
+    builder.Services.AddHostedService<WarrantyExpiryAlertService>();
 
-// ===== JWT Authentication =====
-var jwtKey = builder.Configuration["Jwt:Key"] 
-    ?? throw new InvalidOperationException("Jwt:Key is missing in configuration");
-var jwtIssuer = builder.Configuration["Jwt:Issuer"];
-var jwtAudience = builder.Configuration["Jwt:Audience"];
-
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options =>
+    // Swagger hỗ trợ JWT Bearer
+    builder.Services.AddSwaggerGen(c =>
     {
-        options.TokenValidationParameters = new TokenValidationParameters
+        c.SwaggerDoc("v1", new OpenApiInfo { Title = "EWarrantySystem API", Version = "v1" });
+
+        var securityScheme = new OpenApiSecurityScheme
         {
-            ValidateIssuer = true,
-            ValidateAudience = true,
-            ValidateLifetime = true,
-            ValidateIssuerSigningKey = true,
-            ValidIssuer = jwtIssuer,
-            ValidAudience = jwtAudience,
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
-            ClockSkew = TimeSpan.Zero
+            Name = "Authorization",
+            Description = "Nhập JWT token theo dạng: Bearer {token}",
+            In = ParameterLocation.Header,
+            Type = SecuritySchemeType.Http,
+            Scheme = "bearer",
+            BearerFormat = "JWT"
         };
-    });
 
-builder.Services.AddAuthorization();
-builder.Services.AddScoped<EWarrantySystem.Services.JwtTokenService>();
+        c.AddSecurityDefinition("Bearer", securityScheme);
 
-// ===== CORS =====
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("AllowFrontend", policy =>
-    {
-        policy.WithOrigins(
-                "http://localhost:3000",   // React / Next dev
-                "http://localhost:5173",   // Vite
-                "http://localhost:4200"    // Angular (nếu dùng)
-            )
-            .AllowAnyHeader()
-            .AllowAnyMethod()
-            .AllowCredentials();
-    });
-});
-
-var app = builder.Build();
-
-// Global exception handling — phải đứng trước các middleware khác
-app.UseExceptionHandler(errorApp =>
-{
-    errorApp.Run(async context =>
-    {
-        context.Response.StatusCode = StatusCodes.Status500InternalServerError;
-        context.Response.ContentType = "application/json";
-
-        var exceptionFeature = context.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>();
-        var error = exceptionFeature?.Error;
-
-        // Production: không lộ stack trace
-        var message = app.Environment.IsDevelopment()
-            ? error?.ToString()
-            : "Đã xảy ra lỗi hệ thống. Vui lòng thử lại sau.";
-
-        await context.Response.WriteAsJsonAsync(new
+        // Sửa thành lambda function: _ => new OpenApiSecurityRequirement
+        c.AddSecurityRequirement(_ => new OpenApiSecurityRequirement
         {
-            status = 500,
-            message
+            {
+                new OpenApiSecuritySchemeReference("Bearer"),
+                new List<string>()
+            }
         });
     });
-});
 
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
+    // DbContext
+    builder.Services.AddDbContext<AppDbContext>(options =>
+        options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+    // ===== JWT Authentication =====
+    var jwtKey = builder.Configuration["Jwt:Key"]
+        ?? throw new InvalidOperationException("Jwt:Key is missing in configuration");
+    var jwtIssuer = builder.Configuration["Jwt:Issuer"];
+    var jwtAudience = builder.Configuration["Jwt:Audience"];
+
+    builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+        .AddJwtBearer(options =>
+        {
+            options.TokenValidationParameters = new TokenValidationParameters
+            {
+                ValidateIssuer = true,
+                ValidateAudience = true,
+                ValidateLifetime = true,
+                ValidateIssuerSigningKey = true,
+                ValidIssuer = jwtIssuer,
+                ValidAudience = jwtAudience,
+                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
+                ClockSkew = TimeSpan.Zero
+            };
+        });
+
+    builder.Services.AddAuthorization();
+    builder.Services.AddScoped<EWarrantySystem.Services.JwtTokenService>();
+
+    // ===== CORS =====
+    builder.Services.AddCors(options =>
+    {
+        options.AddPolicy("AllowFrontend", policy =>
+        {
+            policy.WithOrigins(
+                    "http://localhost:3000",   // React / Next dev
+                    "http://localhost:5173",   // Vite
+                    "http://localhost:4200"    // Angular (nếu dùng)
+                )
+                .AllowAnyHeader()
+                .AllowAnyMethod()
+                .AllowCredentials();
+        });
+    });
+
+    var app = builder.Build();
+    app.UseSerilogRequestLogging(); // log mỗi HTTP request
+
+    // Global exception handling — phải đứng trước các middleware khác
+    app.UseExceptionHandler(errorApp =>
+    {
+        errorApp.Run(async context =>
+        {
+            context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+            context.Response.ContentType = "application/json";
+
+            var exceptionFeature = context.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>();
+            var error = exceptionFeature?.Error;
+
+            // Production: không lộ stack trace
+            var message = app.Environment.IsDevelopment()
+                ? error?.ToString()
+                : "Đã xảy ra lỗi hệ thống. Vui lòng thử lại sau.";
+
+            await context.Response.WriteAsJsonAsync(new
+            {
+                status = 500,
+                message
+            });
+        });
+    });
+
+    if (app.Environment.IsDevelopment())
+    {
+        app.UseSwagger();
+        app.UseSwaggerUI();
+    }
+
+    app.UseHttpsRedirection();
+
+    app.UseStaticFiles();
+
+    app.UseCors("AllowFrontend");
+
+    app.UseAuthentication();
+    app.UseAuthorization();
+
+    app.MapControllers();
+
+    app.Run();
 }
-
-app.UseHttpsRedirection();
-
-app.UseCors("AllowFrontend");
-
-app.UseAuthentication();
-app.UseAuthorization();
-
-app.MapControllers();
-
-app.Run();
+catch (Exception ex)
+{
+    Log.Fatal(ex, "Ứng dụng khởi động thất bại");
+}
+finally
+{
+    Log.CloseAndFlush();
+}

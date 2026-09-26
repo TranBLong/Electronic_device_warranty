@@ -5,7 +5,8 @@ namespace EWarrantySystem.Services
     public interface IRepairRequestService
     {
         Task<(bool Success, string? ErrorMessage, RepairRequestResponseDto? Data)> CreateAsync(
-            RepairRequestCreateDto request);
+            RepairRequestCreateDto request,
+            string? evidenceImageUrl = null);
 
         Task<(bool Success, string? ErrorMessage, RepairRequestResponseDto? Data)> AssignTechnicianAsync(
             int id, 

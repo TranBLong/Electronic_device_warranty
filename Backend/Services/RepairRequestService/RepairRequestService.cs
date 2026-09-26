@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using EWarrantySystem.Data;
 using EWarrantySystem.DTOs;
 using EWarrantySystem.Models;
@@ -8,15 +9,18 @@ namespace EWarrantySystem.Services
     public class RepairRequestService : IRepairRequestService
     {
         private readonly AppDbContext _context;
+        private readonly ILogger<RepairRequestService> _logger;
 
-        public RepairRequestService(AppDbContext context)
+        public RepairRequestService(AppDbContext context, ILogger<RepairRequestService> logger)
         {
             _context = context;
+            _logger = logger;
         }
 
         // ==================== CREATE ====================
         public async Task<(bool Success, string? ErrorMessage, RepairRequestResponseDto? Data)> CreateAsync(
-            RepairRequestCreateDto request)
+            RepairRequestCreateDto request,
+            string? evidenceImageUrl = null)
         {
             // 1. Kiểm tra Product tồn tại
             var product = await _context.Products
@@ -70,11 +74,16 @@ namespace EWarrantySystem.Services
                 CustomerId = request.CustomerId,
                 ReceptionistId = request.ReceptionistId,
                 Status = RepairStatusEnum.Pending,
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.UtcNow,
+                EvidenceImageUrl = evidenceImageUrl
             };
 
             _context.RepairRequests.Add(newRequest);
             await _context.SaveChangesAsync();
+
+            var code = newRequest.RequestCode;
+            var customerId = newRequest.CustomerId;
+            _logger.LogInformation("Tạo phiếu sửa chữa {RequestCode} cho CustomerId={CustomerId}", code, customerId);
 
             // Load navigation properties
             await _context.Entry(newRequest).Reference(r => r.Product).LoadAsync();
@@ -229,7 +238,9 @@ namespace EWarrantySystem.Services
                 ReceptionistName = request.Receptionist?.FullName,
 
                 TechnicianId = request.TechnicianId,
-                TechnicianName = request.Technician?.FullName
+                TechnicianName = request.Technician?.FullName,
+
+                EvidenceImageUrl = request.EvidenceImageUrl
             };
         }
 

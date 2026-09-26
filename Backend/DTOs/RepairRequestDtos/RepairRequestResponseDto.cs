@@ -34,5 +34,7 @@ namespace EWarrantySystem.DTOs
         // Thông tin Kỹ thuật viên phụ trách sửa chữa (null nếu chưa được phân công)[cite: 1, 2]
         public int? TechnicianId { get; set; }
         public string? TechnicianName { get; set; }
+
+        public string? EvidenceImageUrl { get; set; }
     }
 }

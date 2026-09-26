@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.Http;
 
 namespace EWarrantySystem.DTOs
 {
@@ -24,5 +25,10 @@ namespace EWarrantySystem.DTOs
         /// </summary>
         [Range(1, int.MaxValue, ErrorMessage = "ReceptionistId phải là số nguyên dương hợp lệ")]
         public int? ReceptionistId { get; set; }
+
+        [MaxLength(500)]
+        public string? EvidenceImageUrl { get; set; }
+
+        public IFormFile? EvidenceImage { get; set; }
     }
 }

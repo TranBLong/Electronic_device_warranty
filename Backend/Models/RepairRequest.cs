@@ -23,6 +23,9 @@ namespace EWarrantySystem.Models
 
         public DateTime? CompletedAt { get; set; } // Ngày sửa xong hoàn tất[cite: 2]
 
+        [MaxLength(500)]
+        public string? EvidenceImageUrl { get; set; }  // đường dẫn ảnh lưu trên server
+
         // ============================================================
         // FOREIGN KEYS & NAVIGATION PROPERTIES[cite: 2, 3]
         // ============================================================
