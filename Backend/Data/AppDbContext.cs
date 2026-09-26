@@ -11,6 +11,8 @@ namespace EWarrantySystem.Data
         public DbSet<Product> Products { get; set; } = null!;
         public DbSet<WarrantyCard> WarrantyCards { get; set; } = null!;
         public DbSet<RepairRequest> RepairRequests { get; set; } = null!;
+        public DbSet<RepairRequestStatusHistory> RepairRequestStatusHistories { get; set; } = null!;
+        public DbSet<RefreshToken> RefreshTokens { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -22,7 +24,7 @@ namespace EWarrantySystem.Data
             modelBuilder.Entity<WarrantyCard>().HasIndex(w => w.CardCode).IsUnique();
             modelBuilder.Entity<RepairRequest>().HasIndex(r => r.RequestCode).IsUnique();
 
-            // Ánh xạ chính xác các khóa ngoại đến User (chỉ định rõ inverse collection)
+            // Ánh xạ các khóa ngoại đến User trong RepairRequest
             modelBuilder.Entity<RepairRequest>(entity =>
             {
                 entity.HasOne(r => r.Customer)
@@ -38,6 +40,15 @@ namespace EWarrantySystem.Data
                 entity.HasOne(r => r.Technician)
                       .WithMany(u => u.TechnicianRequests)
                       .HasForeignKey(r => r.TechnicianId)
+                      .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            // Tắt Cascade Delete giữa RepairRequestStatusHistory và User để tránh lỗi SQL 1785
+            modelBuilder.Entity<RepairRequestStatusHistory>(entity =>
+            {
+                entity.HasOne(h => h.ChangedByUser)
+                      .WithMany()
+                      .HasForeignKey(h => h.ChangedByUserId)
                       .OnDelete(DeleteBehavior.Restrict);
             });
         }

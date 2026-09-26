@@ -8,8 +8,11 @@ namespace EWarrantySystem.Services
             UserRegisterDto request, 
             bool isAdmin = false);
 
-        Task<(bool Success, string? ErrorMessage, string? Token, UserResponseDto? Data)> LoginAsync(
+        Task<(bool Success, string? ErrorMessage, string? Token, string? RefreshToken, UserResponseDto? Data)> LoginAsync(
             UserLoginDto request);
+
+        Task<(bool Success, string? ErrorMessage, string? AccessToken, string? RefreshToken, UserResponseDto? Data)> RefreshTokenAsync(
+            string refreshToken);
 
         Task<(bool Success, string? ErrorMessage, UserResponseDto? Data)> UpdateProfileAsync(
             int id, 

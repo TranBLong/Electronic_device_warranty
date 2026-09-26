@@ -118,6 +118,25 @@ namespace EWarrantySystem.Controllers
             {
                 message = "Đăng nhập thành công!",
                 token = result.Token,
+                refreshToken = result.RefreshToken,
+                user = result.Data
+            });
+        }
+
+        [HttpPost("refresh-token")]
+        [AllowAnonymous]
+        public async Task<IActionResult> RefreshToken([FromBody] RefreshTokenDto request)
+        {
+            var result = await _userService.RefreshTokenAsync(request.RefreshToken);
+
+            if (!result.Success)
+                return BadRequest(new { message = result.ErrorMessage });
+
+            return Ok(new
+            {
+                message = "Làm mới token thành công!",
+                token = result.AccessToken,
+                refreshToken = result.RefreshToken,
                 user = result.Data
             });
         }

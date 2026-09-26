@@ -201,7 +201,11 @@ namespace EWarrantySystem.Controllers
         [Authorize(Roles = "Admin,Manager,Receptionist")]
         public async Task<IActionResult> AssignTechnician(int id, [FromBody] RepairRequestAssignDto request)
         {
-            var result = await _repairRequestService.AssignTechnicianAsync(id, request);
+            var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userIdClaim) || !int.TryParse(userIdClaim, out var currentUserId))
+                return Unauthorized(new { message = "Token không hợp lệ." });
+
+            var result = await _repairRequestService.AssignTechnicianAsync(id, request, currentUserId);
 
             if (!result.Success)
             {
@@ -226,7 +230,11 @@ namespace EWarrantySystem.Controllers
         [Authorize(Roles = "Admin,Manager,Technician")]
         public async Task<IActionResult> UpdateStatus(int id, [FromBody] RepairRequestUpdateStatusDto request)
         {
-            var result = await _repairRequestService.UpdateStatusAsync(id, request);
+            var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userIdClaim) || !int.TryParse(userIdClaim, out var currentUserId))
+                return Unauthorized(new { message = "Token không hợp lệ." });
+
+            var result = await _repairRequestService.UpdateStatusAsync(id, request, currentUserId);
 
             if (!result.Success)
             {
@@ -256,6 +264,36 @@ namespace EWarrantySystem.Controllers
                 return NotFound(new { message = result.ErrorMessage });
 
             return NoContent();
+        }
+
+        /// <summary>
+        /// API 8: XEM LỊCH SỬ THAY ĐỔI TRẠNG THÁI PHIẾU SỬA CHỮA
+        /// </summary>
+        [HttpGet("{id:int}/history")]
+        [Authorize]
+        public async Task<IActionResult> GetStatusHistory(int id)
+        {
+            var exists = await _context.RepairRequests.AnyAsync(r => r.Id == id);
+            if (!exists)
+                return NotFound(new { message = $"Không tìm thấy phiếu Id = {id}" });
+
+            var history = await _context.RepairRequestStatusHistories
+                .Include(h => h.ChangedByUser)
+                .Where(h => h.RepairRequestId == id)
+                .OrderByDescending(h => h.ChangedAt)
+                .Select(h => new
+                {
+                    h.Id,
+                    h.FromStatus,
+                    h.ToStatus,
+                    h.Note,
+                    h.ChangedAt,
+                    ChangedByUserId = h.ChangedByUserId,
+                    ChangedByName = h.ChangedByUser!.FullName
+                })
+                .ToListAsync();
+
+            return Ok(history);
         }
 
         #region --- HÀM BỔ TRỢ CHUYỂN ĐỔI DTO ---

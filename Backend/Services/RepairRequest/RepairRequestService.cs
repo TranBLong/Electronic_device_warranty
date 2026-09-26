@@ -19,16 +19,31 @@ namespace EWarrantySystem.Services
             RepairRequestCreateDto request)
         {
             // 1. Kiểm tra Product tồn tại
-            var product = await _context.Products.FindAsync(request.ProductId);
+            var product = await _context.Products
+                .Include(p => p.WarrantyCard)
+                .FirstOrDefaultAsync(p => p.Id == request.ProductId);
             if (product == null)
                 return (false, $"Không tìm thấy thiết bị có ProductId = {request.ProductId}!", null);
 
-            // 2. Kiểm tra Customer tồn tại
+            // 2. Kiểm tra hạn bảo hành
+            var warranty = product.WarrantyCard;
+            bool isUnderWarranty = warranty != null
+                && warranty.IsActive
+                && warranty.EndDate >= DateTime.UtcNow;
+
+            if (!isUnderWarranty)
+            {
+                return (false,
+                    "Thiết bị đã hết hạn bảo hành hoặc chưa có thẻ bảo hành hợp lệ. Không thể tạo phiếu sửa chữa bảo hành!",
+                    null);
+            }
+
+            // 3. Kiểm tra Customer tồn tại
             var customer = await _context.Users.FindAsync(request.CustomerId);
             if (customer == null)
                 return (false, $"Không tìm thấy khách hàng có CustomerId = {request.CustomerId}!", null);
 
-            // 3. Kiểm tra Receptionist (nếu có)
+            // 4. Kiểm tra Receptionist (nếu có)
             if (request.ReceptionistId.HasValue)
             {
                 var receptionistExists = await _context.Users
@@ -38,7 +53,7 @@ namespace EWarrantySystem.Services
                     return (false, $"Không tìm thấy lễ tân có ReceptionistId = {request.ReceptionistId.Value}!", null);
             }
 
-            // 4. Sinh mã phiếu + kiểm tra trùng
+            // 5. Sinh mã phiếu + kiểm tra trùng
             string generatedCode;
             do
             {
@@ -46,7 +61,7 @@ namespace EWarrantySystem.Services
             }
             while (await _context.RepairRequests.AnyAsync(r => r.RequestCode == generatedCode));
 
-            // 5. Tạo entity
+            // 6. Tạo entity
             var newRequest = new RepairRequest
             {
                 RequestCode = generatedCode,
@@ -61,7 +76,7 @@ namespace EWarrantySystem.Services
             _context.RepairRequests.Add(newRequest);
             await _context.SaveChangesAsync();
 
-            // 6. Load navigation properties
+            // Load navigation properties
             await _context.Entry(newRequest).Reference(r => r.Product).LoadAsync();
             await _context.Entry(newRequest).Reference(r => r.Customer).LoadAsync();
             if (newRequest.ReceptionistId.HasValue)
@@ -73,7 +88,8 @@ namespace EWarrantySystem.Services
         // ==================== ASSIGN TECHNICIAN ====================
         public async Task<(bool Success, string? ErrorMessage, RepairRequestResponseDto? Data)> AssignTechnicianAsync(
             int id, 
-            RepairRequestAssignDto request)
+            RepairRequestAssignDto request,
+            int changedByUserId)
         {
             var repairRequest = await _context.RepairRequests.FindAsync(id);
             if (repairRequest == null)
@@ -86,10 +102,23 @@ namespace EWarrantySystem.Services
             if (!technician.Role.Equals("Technician", StringComparison.OrdinalIgnoreCase))
                 return (false, $"Người dùng ID = {request.TechnicianId} không phải là Kỹ thuật viên!", null);
 
+            var oldStatus = repairRequest.Status.ToString();
             repairRequest.TechnicianId = request.TechnicianId;
 
             if (repairRequest.Status == RepairStatusEnum.Pending)
                 repairRequest.Status = RepairStatusEnum.InProgress;
+
+            // Lưu lịch sử thay đổi
+            var history = new RepairRequestStatusHistory
+            {
+                RepairRequestId = repairRequest.Id,
+                FromStatus = oldStatus,
+                ToStatus = repairRequest.Status.ToString(),
+                Note = $"Phân công kỹ thuật viên ID: {request.TechnicianId}",
+                ChangedByUserId = changedByUserId,
+                ChangedAt = DateTime.UtcNow
+            };
+            _context.RepairRequestStatusHistories.Add(history);
 
             await _context.SaveChangesAsync();
 
@@ -106,7 +135,8 @@ namespace EWarrantySystem.Services
         // ==================== UPDATE STATUS ====================
         public async Task<(bool Success, string? ErrorMessage, RepairRequestResponseDto? Data)> UpdateStatusAsync(
             int id, 
-            RepairRequestUpdateStatusDto request)
+            RepairRequestUpdateStatusDto request,
+            int changedByUserId)
         {
             var repairRequest = await _context.RepairRequests.FindAsync(id);
             if (repairRequest == null)
@@ -119,6 +149,7 @@ namespace EWarrantySystem.Services
                     null);
             }
 
+            var oldStatus = repairRequest.Status.ToString();
             repairRequest.Status = newStatus;
 
             if (!string.IsNullOrWhiteSpace(request.TechnicalNote))
@@ -132,6 +163,18 @@ namespace EWarrantySystem.Services
             {
                 repairRequest.CompletedAt = DateTime.UtcNow;
             }
+
+            // Lưu lịch sử thay đổi trạng thái
+            var history = new RepairRequestStatusHistory
+            {
+                RepairRequestId = repairRequest.Id,
+                FromStatus = oldStatus,
+                ToStatus = newStatus.ToString(),
+                Note = request.TechnicalNote?.Trim(),
+                ChangedByUserId = changedByUserId,
+                ChangedAt = DateTime.UtcNow
+            };
+            _context.RepairRequestStatusHistories.Add(history);
 
             await _context.SaveChangesAsync();
 

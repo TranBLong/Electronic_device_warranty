@@ -11,11 +11,13 @@ namespace EWarrantySystem.Services
     {
         private readonly AppDbContext _context;
         private readonly JwtTokenService _jwtTokenService;
+        private readonly IConfiguration _configuration;
 
-        public UserService(AppDbContext context, JwtTokenService jwtTokenService)
+        public UserService(AppDbContext context, JwtTokenService jwtTokenService, IConfiguration configuration)
         {
             _context = context;
             _jwtTokenService = jwtTokenService;
+            _configuration = configuration;
         }
 
         // ==================== REGISTER ====================
@@ -52,25 +54,63 @@ namespace EWarrantySystem.Services
         }
 
         // ==================== LOGIN ====================
-        public async Task<(bool Success, string? ErrorMessage, string? Token, UserResponseDto? Data)> LoginAsync(
+        public async Task<(bool Success, string? ErrorMessage, string? Token, string? RefreshToken, UserResponseDto? Data)> LoginAsync(
             UserLoginDto request)
         {
             var user = await _context.Users
                 .FirstOrDefaultAsync(u => u.Username.ToLower() == request.Username.ToLower());
 
             if (user == null)
-                return (false, "Tên đăng nhập không tồn tại!", null, null);
+                return (false, "Tên đăng nhập không tồn tại!", null, null, null);
 
             if (!user.IsActive)
-                return (false, "Tài khoản hiện đang bị khóa!", null, null);
+                return (false, "Tài khoản hiện đang bị khóa!", null, null, null);
 
             var storedHash = Encoding.UTF8.GetString(user.PasswordHash);
             if (!VerifyPassword(request.Password, storedHash))
-                return (false, "Mật khẩu không chính xác!", null, null);
+                return (false, "Mật khẩu không chính xác!", null, null, null);
 
             var token = _jwtTokenService.GenerateToken(user);
+            var refreshToken = _jwtTokenService.GenerateRefreshToken();
+            var refreshDays = int.Parse(_configuration["Jwt:RefreshTokenExpireDays"] ?? "7");
 
-            return (true, null, token, MapToResponseDto(user));
+            _context.RefreshTokens.Add(new RefreshToken
+            {
+                UserId = user.Id,
+                Token = refreshToken,
+                ExpiresAt = DateTime.UtcNow.AddDays(refreshDays)
+            });
+            await _context.SaveChangesAsync();
+
+            return (true, null, token, refreshToken, MapToResponseDto(user));
+        }
+
+        // ==================== REFRESH TOKEN ====================
+        public async Task<(bool Success, string? ErrorMessage, string? AccessToken, string? RefreshToken, UserResponseDto? Data)> RefreshTokenAsync(string refreshToken)
+        {
+            var stored = await _context.RefreshTokens
+                .Include(t => t.User)
+                .FirstOrDefaultAsync(t => t.Token == refreshToken);
+
+            if (stored == null || !stored.IsActive || stored.User == null || !stored.User.IsActive)
+                return (false, "Refresh token không hợp lệ hoặc đã hết hạn!", null, null, null);
+
+            // Rotate: revoke cũ, cấp mới
+            stored.RevokedAt = DateTime.UtcNow;
+
+            var newAccess = _jwtTokenService.GenerateToken(stored.User);
+            var newRefresh = _jwtTokenService.GenerateRefreshToken();
+            var refreshDays = int.Parse(_configuration["Jwt:RefreshTokenExpireDays"] ?? "7");
+
+            _context.RefreshTokens.Add(new RefreshToken
+            {
+                UserId = stored.UserId,
+                Token = newRefresh,
+                ExpiresAt = DateTime.UtcNow.AddDays(refreshDays)
+            });
+            await _context.SaveChangesAsync();
+
+            return (true, null, newAccess, newRefresh, MapToResponseDto(stored.User));
         }
 
         // ==================== UPDATE PROFILE ====================
