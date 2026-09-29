@@ -19,6 +19,33 @@ namespace Warranty.Tests;
 public sealed class WarrantyApiTests
 {
     [Fact]
+    public async Task SeedAsync_InsertsFiveRecordsPerTableUsingGeneratedIds()
+    {
+        await using var testDatabase = await TestDatabase.CreateAsync();
+
+        await DatabaseSeeder.SeedAsync(testDatabase.Context);
+
+        Assert.Equal(5, await testDatabase.Context.Users.CountAsync());
+        Assert.Equal(5, await testDatabase.Context.Products.CountAsync());
+        Assert.Equal(5, await testDatabase.Context.WarrantyCards.CountAsync());
+        Assert.Equal(5, await testDatabase.Context.RepairRequests.CountAsync());
+        Assert.Equal(5, await testDatabase.Context.RepairRequestStatusHistories.CountAsync());
+        Assert.Equal(5, await testDatabase.Context.RefreshTokens.CountAsync());
+        Assert.All(await testDatabase.Context.Users.Select(user => user.Id).ToListAsync(), id => Assert.True(id > 0));
+        Assert.All(await testDatabase.Context.Products.Select(product => product.Id).ToListAsync(), id => Assert.True(id > 0));
+
+        var cards = await testDatabase.Context.WarrantyCards
+            .Include(card => card.Product)
+            .Include(card => card.Customer)
+            .ToListAsync();
+        Assert.All(cards, card => Assert.Equal(UserRole.Customer, card.Customer.Role));
+        Assert.Equal(5, cards.Select(card => card.ProductId).Distinct().Count());
+
+        await DatabaseSeeder.SeedAsync(testDatabase.Context);
+        Assert.Equal(5, await testDatabase.Context.Users.CountAsync());
+    }
+
+    [Fact]
     public async Task Register_AlwaysCreatesCustomerAndStoresOnlyPasswordHash()
     {
         await using var testDatabase = await TestDatabase.CreateAsync();
