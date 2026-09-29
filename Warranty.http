@@ -1,6 +1,32 @@
 @Warranty_HostAddress = http://localhost:5190
 
-GET {{Warranty_HostAddress}}/weatherforecast/
-Accept: application/json
+POST {{Warranty_HostAddress}}/api/auth/register
+Content-Type: application/json
+
+{
+  "fullName": "Warranty Customer",
+  "email": "customer@example.com",
+  "password": "ReplaceWithAStrongPassword123",
+  "phone": "555-0100"
+}
+
+###
+
+POST {{Warranty_HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "customer@example.com",
+  "password": "ReplaceWithAStrongPassword123"
+}
+
+###
+
+POST {{Warranty_HostAddress}}/api/auth/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "PasteRefreshTokenFromLoginResponse"
+}
 
 ###

@@ -166,3 +166,7 @@ D:\FileBaiTap\Ky7\3tc\Web2\Code\Warranty\obj\Debug\net10.0\refint\Warranty.dll
 D:\FileBaiTap\Ky7\3tc\Web2\Code\Warranty\obj\Debug\net10.0\Warranty.pdb
 D:\FileBaiTap\Ky7\3tc\Web2\Code\Warranty\obj\Debug\net10.0\Warranty.genruntimeconfig.cache
 D:\FileBaiTap\Ky7\3tc\Web2\Code\Warranty\obj\Debug\net10.0\ref\Warranty.dll
+D:\FileBaiTap\Ky7\3tc\Web2\Code\Warranty\bin\Debug\net10.0\BCrypt-Net-Next.dll
+D:\FileBaiTap\Ky7\3tc\Web2\Code\Warranty\bin\Debug\net10.0\Microsoft.AspNetCore.Authentication.JwtBearer.dll
+D:\FileBaiTap\Ky7\3tc\Web2\Code\Warranty\bin\Debug\net10.0\Microsoft.Bcl.Cryptography.dll
+D:\FileBaiTap\Ky7\3tc\Web2\Code\Warranty\obj\Debug\net10.0\Warranty.sourcelink.json
