@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "dgSpecHash": "T9/K/nz2kzA=",
+  "dgSpecHash": "tFon2p46K5Y=",
   "success": true,
   "projectFilePath": "D:\\FileBaiTap\\Ky7\\3tc\\Web2\\Code\\Warranty\\Warranty.csproj",
   "expectedPackageFiles": [
@@ -40,7 +40,7 @@
     "C:\\Users\\ASUS\\.nuget\\packages\\microsoft.identitymodel.protocols\\8.19.2\\microsoft.identitymodel.protocols.8.19.2.nupkg.sha512",
     "C:\\Users\\ASUS\\.nuget\\packages\\microsoft.identitymodel.protocols.openidconnect\\8.19.2\\microsoft.identitymodel.protocols.openidconnect.8.19.2.nupkg.sha512",
     "C:\\Users\\ASUS\\.nuget\\packages\\microsoft.identitymodel.tokens\\8.19.2\\microsoft.identitymodel.tokens.8.19.2.nupkg.sha512",
-    "C:\\Users\\ASUS\\.nuget\\packages\\microsoft.openapi\\2.7.5\\microsoft.openapi.2.7.5.nupkg.sha512",
+    "C:\\Users\\ASUS\\.nuget\\packages\\microsoft.openapi\\2.8.0\\microsoft.openapi.2.8.0.nupkg.sha512",
     "C:\\Users\\ASUS\\.nuget\\packages\\microsoft.sqlserver.server\\1.0.0\\microsoft.sqlserver.server.1.0.0.nupkg.sha512",
     "C:\\Users\\ASUS\\.nuget\\packages\\microsoft.visualstudio.solutionpersistence\\1.0.52\\microsoft.visualstudio.solutionpersistence.1.0.52.nupkg.sha512",
     "C:\\Users\\ASUS\\.nuget\\packages\\mono.texttemplating\\3.0.0\\mono.texttemplating.3.0.0.nupkg.sha512",

@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Warranty.Enums;
 using Warranty.Models;
+using Warranty.Services;
 
 namespace Warranty.Data;
 
@@ -19,7 +20,7 @@ public static class DatabaseSeeder
             {
                 FullName = "Nguyen Van An",
                 Email = "admin@warranty.local",
-                PasswordHash = "$2a$11$y70l04nWlRrCUWpAxVJx1u6M32Gb35kPgBoYvzbOyGAz6wIhGJ2UW",
+                PasswordHash = PasswordHashing.Hash("Admin@123"),
                 Phone = "0901000001",
                 Role = UserRole.Admin,
                 IsActive = true,
@@ -29,7 +30,7 @@ public static class DatabaseSeeder
             {
                 FullName = "Tran Thi Binh",
                 Email = "manager@warranty.local",
-                PasswordHash = "$2a$11$sLiGaZHJ7MqHPuU1D5g2OuPRnkQ1lPp5FpHY5sh2agsJ7Gxspee0m",
+                PasswordHash = PasswordHashing.Hash("Manager@123"),
                 Phone = "0901000002",
                 Role = UserRole.Manager,
                 IsActive = true,
@@ -39,7 +40,7 @@ public static class DatabaseSeeder
             {
                 FullName = "Le Hoai Chi",
                 Email = "reception@warranty.local",
-                PasswordHash = "$2a$11$ukvy3qgFwz3vJz9Ieo4YG.VH1SWFcZx2B5EHQRXb0S7UlM34tZr/m",
+                PasswordHash = PasswordHashing.Hash("Receptionist@123"),
                 Phone = "0901000003",
                 Role = UserRole.Receptionist,
                 IsActive = true,
@@ -49,7 +50,7 @@ public static class DatabaseSeeder
             {
                 FullName = "Pham Van Duy",
                 Email = "tech01@warranty.local",
-                PasswordHash = "$2a$11$w/FH/Jd561N7aKbsTv4WBuemHHvejOdTcgLC9BisMu.waSjKXwr6.",
+                PasswordHash = PasswordHashing.Hash("Technician@123"),
                 Phone = "0901000004",
                 Role = UserRole.Technician,
                 IsActive = true,
@@ -59,7 +60,7 @@ public static class DatabaseSeeder
             {
                 FullName = "Nguyen Thi Emy",
                 Email = "customer01@warranty.local",
-                PasswordHash = "$2a$11$ojyUBHqBKEeQNyAOFogOMu5bLNHgRbsGLl02AGP/OBCrKwiT6zAdq",
+                PasswordHash = PasswordHashing.Hash("Customer@123"),
                 Phone = "0901000005",
                 Role = UserRole.Customer,
                 IsActive = true,
