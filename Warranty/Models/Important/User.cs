@@ -5,6 +5,7 @@ namespace Warranty.Models;
 public class User
 {
     public int Id { get; set; }
+    public int? ServiceCenterId { get; set; }
     public required string FullName { get; set; }
     public required string Email { get; set; }
     public required string PasswordHash { get; set; }
@@ -13,9 +14,12 @@ public class User
     public bool IsActive { get; set; } = true;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
+    public ServiceCenter? ServiceCenter { get; set; }
     public ICollection<WarrantyCard> WarrantyCards { get; set; } = new List<WarrantyCard>();
     public ICollection<RepairRequest> CreatedRepairRequests { get; set; } = new List<RepairRequest>();
     public ICollection<RepairRequest> AssignedRepairRequests { get; set; } = new List<RepairRequest>();
     public ICollection<RepairRequestStatusHistory> RepairRequestStatusChanges { get; set; } = new List<RepairRequestStatusHistory>();
     public ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
+    public ICollection<Notification> Notifications { get; set; } = new List<Notification>();
+    public ICollection<Feedback> Feedbacks { get; set; } = new List<Feedback>();
 }

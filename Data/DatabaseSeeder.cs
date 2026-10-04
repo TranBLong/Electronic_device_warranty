@@ -5,12 +5,13 @@ using Warranty.Services;
 
 namespace Warranty.Data;
 
-public static class DatabaseSeeder
+public static partial class DatabaseSeeder
 {
     public static async Task SeedAsync(AppDbContext dbContext)
     {
         if (await dbContext.Users.AnyAsync())
         {
+            await SeedExtendedAsync(dbContext);
             return;
         }
 
@@ -319,6 +320,8 @@ public static class DatabaseSeeder
 
         dbContext.RefreshTokens.AddRange(refreshTokens);
         await dbContext.SaveChangesAsync();
+
+        await SeedExtendedAsync(dbContext);
     }
 
     private static string GenerateRefreshTokenHash() =>

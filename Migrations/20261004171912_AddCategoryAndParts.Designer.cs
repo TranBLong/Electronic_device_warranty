@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Warranty.Data;
 
@@ -11,9 +12,11 @@ using Warranty.Data;
 namespace Warranty.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20261004171912_AddCategoryAndParts")]
+    partial class AddCategoryAndParts
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -51,140 +54,6 @@ namespace Warranty.Migrations
                         .IsUnique();
 
                     b.ToTable("Categories");
-                });
-
-            modelBuilder.Entity("Warranty.Models.Feedback", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("Comment")
-                        .HasMaxLength(1000)
-                        .HasColumnType("nvarchar(1000)");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("CustomerId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("Rating")
-                        .HasColumnType("int");
-
-                    b.Property<int>("RepairRequestId")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CustomerId");
-
-                    b.HasIndex("RepairRequestId")
-                        .IsUnique();
-
-                    b.ToTable("Feedbacks", t =>
-                        {
-                            t.HasCheckConstraint("CK_Feedbacks_Rating", "[Rating] BETWEEN 1 AND 5");
-                        });
-                });
-
-            modelBuilder.Entity("Warranty.Models.Invoice", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("InvoiceNumber")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
-                    b.Property<DateTime>("IssuedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<decimal>("LaborTotal")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<DateTime?>("PaidAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<decimal>("PartsTotal")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<int>("RepairRequestId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("nvarchar(30)");
-
-                    b.Property<decimal>("TotalAmount")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("InvoiceNumber")
-                        .IsUnique();
-
-                    b.HasIndex("RepairRequestId")
-                        .IsUnique();
-
-                    b.ToTable("Invoices", t =>
-                        {
-                            t.HasCheckConstraint("CK_Invoices_TotalAmount", "[TotalAmount] >= 0");
-                        });
-                });
-
-            modelBuilder.Entity("Warranty.Models.Notification", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<bool>("IsRead")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("Message")
-                        .IsRequired()
-                        .HasMaxLength(1000)
-                        .HasColumnType("nvarchar(1000)");
-
-                    b.Property<int?>("RepairRequestId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<string>("Type")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
-                    b.Property<int>("UserId")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("RepairRequestId");
-
-                    b.HasIndex("UserId", "IsRead");
-
-                    b.ToTable("Notifications");
                 });
 
             modelBuilder.Entity("Warranty.Models.Part", b =>
@@ -232,48 +101,6 @@ namespace Warranty.Migrations
                             t.HasCheckConstraint("CK_Parts_StockQuantity", "[StockQuantity] >= 0");
 
                             t.HasCheckConstraint("CK_Parts_UnitPrice", "[UnitPrice] >= 0");
-                        });
-                });
-
-            modelBuilder.Entity("Warranty.Models.Payment", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<decimal>("Amount")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<int>("InvoiceId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Method")
-                        .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("nvarchar(30)");
-
-                    b.Property<string>("Note")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<DateTime>("PaidAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("ReceivedById")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("InvoiceId");
-
-                    b.HasIndex("ReceivedById");
-
-                    b.ToTable("Payments", t =>
-                        {
-                            t.HasCheckConstraint("CK_Payments_Amount", "[Amount] > 0");
                         });
                 });
 
@@ -388,9 +215,6 @@ namespace Warranty.Migrations
                     b.Property<int?>("ReceptionistId")
                         .HasColumnType("int");
 
-                    b.Property<int?>("ServiceCenterId")
-                        .HasColumnType("int");
-
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(30)
@@ -409,57 +233,11 @@ namespace Warranty.Migrations
 
                     b.HasIndex("ReceptionistId");
 
-                    b.HasIndex("ServiceCenterId");
-
                     b.HasIndex("TechnicianId");
 
                     b.HasIndex("WarrantyCardId");
 
                     b.ToTable("RepairRequests");
-                });
-
-            modelBuilder.Entity("Warranty.Models.RepairRequestAttachment", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("ContentType")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("FileName")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
-
-                    b.Property<string>("FilePath")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<long>("FileSize")
-                        .HasColumnType("bigint");
-
-                    b.Property<int>("RepairRequestId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime>("UploadedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("UploadedById")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("RepairRequestId");
-
-                    b.HasIndex("UploadedById");
-
-                    b.ToTable("RepairRequestAttachments");
                 });
 
             modelBuilder.Entity("Warranty.Models.RepairRequestPart", b =>
@@ -534,42 +312,6 @@ namespace Warranty.Migrations
                     b.ToTable("RepairRequestStatusHistories");
                 });
 
-            modelBuilder.Entity("Warranty.Models.ServiceCenter", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("Address")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<string>("Phone")
-                        .HasMaxLength(30)
-                        .HasColumnType("nvarchar(30)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Name")
-                        .IsUnique();
-
-                    b.ToTable("ServiceCenters");
-                });
-
             modelBuilder.Entity("Warranty.Models.User", b =>
                 {
                     b.Property<int>("Id")
@@ -608,15 +350,10 @@ namespace Warranty.Migrations
                         .HasMaxLength(30)
                         .HasColumnType("nvarchar(30)");
 
-                    b.Property<int?>("ServiceCenterId")
-                        .HasColumnType("int");
-
                     b.HasKey("Id");
 
                     b.HasIndex("Email")
                         .IsUnique();
-
-                    b.HasIndex("ServiceCenterId");
 
                     b.ToTable("Users");
                 });
@@ -658,73 +395,6 @@ namespace Warranty.Migrations
                         });
                 });
 
-            modelBuilder.Entity("Warranty.Models.Feedback", b =>
-                {
-                    b.HasOne("Warranty.Models.User", "Customer")
-                        .WithMany("Feedbacks")
-                        .HasForeignKey("CustomerId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("Warranty.Models.RepairRequest", "RepairRequest")
-                        .WithOne("Feedback")
-                        .HasForeignKey("Warranty.Models.Feedback", "RepairRequestId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Customer");
-
-                    b.Navigation("RepairRequest");
-                });
-
-            modelBuilder.Entity("Warranty.Models.Invoice", b =>
-                {
-                    b.HasOne("Warranty.Models.RepairRequest", "RepairRequest")
-                        .WithOne("Invoice")
-                        .HasForeignKey("Warranty.Models.Invoice", "RepairRequestId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("RepairRequest");
-                });
-
-            modelBuilder.Entity("Warranty.Models.Notification", b =>
-                {
-                    b.HasOne("Warranty.Models.RepairRequest", "RepairRequest")
-                        .WithMany("Notifications")
-                        .HasForeignKey("RepairRequestId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("Warranty.Models.User", "User")
-                        .WithMany("Notifications")
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("RepairRequest");
-
-                    b.Navigation("User");
-                });
-
-            modelBuilder.Entity("Warranty.Models.Payment", b =>
-                {
-                    b.HasOne("Warranty.Models.Invoice", "Invoice")
-                        .WithMany("Payments")
-                        .HasForeignKey("InvoiceId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Warranty.Models.User", "ReceivedBy")
-                        .WithMany()
-                        .HasForeignKey("ReceivedById")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Invoice");
-
-                    b.Navigation("ReceivedBy");
-                });
-
             modelBuilder.Entity("Warranty.Models.Product", b =>
                 {
                     b.HasOne("Warranty.Models.Category", "Category")
@@ -753,11 +423,6 @@ namespace Warranty.Migrations
                         .HasForeignKey("ReceptionistId")
                         .OnDelete(DeleteBehavior.Restrict);
 
-                    b.HasOne("Warranty.Models.ServiceCenter", "ServiceCenter")
-                        .WithMany("RepairRequests")
-                        .HasForeignKey("ServiceCenterId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
                     b.HasOne("Warranty.Models.User", "Technician")
                         .WithMany("AssignedRepairRequests")
                         .HasForeignKey("TechnicianId")
@@ -771,30 +436,9 @@ namespace Warranty.Migrations
 
                     b.Navigation("Receptionist");
 
-                    b.Navigation("ServiceCenter");
-
                     b.Navigation("Technician");
 
                     b.Navigation("WarrantyCard");
-                });
-
-            modelBuilder.Entity("Warranty.Models.RepairRequestAttachment", b =>
-                {
-                    b.HasOne("Warranty.Models.RepairRequest", "RepairRequest")
-                        .WithMany("Attachments")
-                        .HasForeignKey("RepairRequestId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Warranty.Models.User", "UploadedBy")
-                        .WithMany()
-                        .HasForeignKey("UploadedById")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("RepairRequest");
-
-                    b.Navigation("UploadedBy");
                 });
 
             modelBuilder.Entity("Warranty.Models.RepairRequestPart", b =>
@@ -835,16 +479,6 @@ namespace Warranty.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("Warranty.Models.User", b =>
-                {
-                    b.HasOne("Warranty.Models.ServiceCenter", "ServiceCenter")
-                        .WithMany("Staff")
-                        .HasForeignKey("ServiceCenterId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.Navigation("ServiceCenter");
-                });
-
             modelBuilder.Entity("Warranty.Models.WarrantyCard", b =>
                 {
                     b.HasOne("Warranty.Models.User", "Customer")
@@ -869,11 +503,6 @@ namespace Warranty.Migrations
                     b.Navigation("Products");
                 });
 
-            modelBuilder.Entity("Warranty.Models.Invoice", b =>
-                {
-                    b.Navigation("Payments");
-                });
-
             modelBuilder.Entity("Warranty.Models.Part", b =>
                 {
                     b.Navigation("RepairRequestParts");
@@ -886,24 +515,9 @@ namespace Warranty.Migrations
 
             modelBuilder.Entity("Warranty.Models.RepairRequest", b =>
                 {
-                    b.Navigation("Attachments");
-
-                    b.Navigation("Feedback");
-
-                    b.Navigation("Invoice");
-
-                    b.Navigation("Notifications");
-
                     b.Navigation("Parts");
 
                     b.Navigation("StatusHistory");
-                });
-
-            modelBuilder.Entity("Warranty.Models.ServiceCenter", b =>
-                {
-                    b.Navigation("RepairRequests");
-
-                    b.Navigation("Staff");
                 });
 
             modelBuilder.Entity("Warranty.Models.User", b =>
@@ -911,10 +525,6 @@ namespace Warranty.Migrations
                     b.Navigation("AssignedRepairRequests");
 
                     b.Navigation("CreatedRepairRequests");
-
-                    b.Navigation("Feedbacks");
-
-                    b.Navigation("Notifications");
 
                     b.Navigation("RefreshTokens");
 
