@@ -1,0 +1,5 @@
+E-Warranty-Complete/
+├── HUONG_DAN_CHAY.md
+├── README.md
+├── backend/     <-- ASP.NET Core API
+└── frontend/    <-- React (Vite + Tailwind)
