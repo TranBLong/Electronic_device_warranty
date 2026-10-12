@@ -4,7 +4,11 @@ namespace Warranty.Services;
 
 public static class PasswordHashing
 {
-    public static bool CanHash(string password) => Encoding.UTF8.GetByteCount(password) <= 72;
+    public static bool CanHash(string password)
+    {
+        var byteCount = Encoding.UTF8.GetByteCount(password);
+        return byteCount is >= 8 and <= 72;
+    }
 
     public static string Hash(string password)
     {

@@ -1,78 +1,37 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using Warranty.Data;
 using Warranty.Dtos;
 using Warranty.Enums;
-using Warranty.Models;
 using Warranty.Services;
+using Warranty.Services.Interfaces.Important;
 
 namespace Warranty.Controllers;
 
 [ApiController]
 [Authorize]
 [Route("api/warranty-cards")]
-public sealed class WarrantyCardsController(AppDbContext dbContext) : ControllerBase
+public sealed class WarrantyCardsController(IWarrantyCardService warrantyCardService) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<WarrantyCardResponse>>> GetAll(CancellationToken cancellationToken)
     {
-        var cards = dbContext.WarrantyCards.AsNoTracking()
-            .Include(card => card.Product)
-            .Include(card => card.Customer)
-            .AsQueryable();
-
-        if (User.IsInRole(nameof(UserRole.Customer)))
+        if (!TryGetIdentity(out var userId, out var role))
         {
-            if (!User.TryGetUserId(out var customerId))
-            {
-                return Unauthorized();
-            }
-
-            cards = cards.Where(card => card.CustomerId == customerId);
-        }
-        else if (!User.IsInRole(nameof(UserRole.Admin)) &&
-                 !User.IsInRole(nameof(UserRole.Receptionist)))
-        {
-            return Forbid();
+            return Unauthorized();
         }
 
-        return Ok(await cards.OrderByDescending(card => card.StartDate)
-            .Select(card => ToResponse(card))
-            .ToListAsync(cancellationToken));
+        return Ok(await warrantyCardService.GetAllAsync(userId, role, cancellationToken));
     }
 
     [HttpGet("{id:int}")]
     public async Task<ActionResult<WarrantyCardResponse>> GetById(int id, CancellationToken cancellationToken)
     {
-        var card = await dbContext.WarrantyCards.AsNoTracking()
-            .Include(candidate => candidate.Product)
-            .Include(candidate => candidate.Customer)
-            .SingleOrDefaultAsync(candidate => candidate.Id == id, cancellationToken);
-        if (card is null)
+        if (!TryGetIdentity(out var userId, out var role))
         {
-            return NotFound();
+            return Unauthorized();
         }
 
-        if (User.IsInRole(nameof(UserRole.Customer)))
-        {
-            if (!User.TryGetUserId(out var customerId))
-            {
-                return Unauthorized();
-            }
-
-            if (card.CustomerId != customerId)
-            {
-                return Forbid();
-            }
-        }
-        else if (!User.IsInRole(nameof(UserRole.Admin)) &&
-                 !User.IsInRole(nameof(UserRole.Receptionist)))
-        {
-            return Forbid();
-        }
-
-        return Ok(ToResponse(card));
+        return Ok(await warrantyCardService.GetByIdAsync(id, userId, role, cancellationToken));
     }
 
     [Authorize(Roles = nameof(UserRole.Receptionist))]
@@ -81,54 +40,18 @@ public sealed class WarrantyCardsController(AppDbContext dbContext) : Controller
         CreateWarrantyCardRequest request,
         CancellationToken cancellationToken)
     {
-        if (request.StartDate == default)
+        if (!User.TryGetUserRole(out var role))
         {
-            return BadRequest(new ProblemDetails { Title = "Start date is required." });
+            return Unauthorized();
         }
 
-        var product = await dbContext.Products.SingleOrDefaultAsync(
-            candidate => candidate.Id == request.ProductId,
-            cancellationToken);
-        if (product is null)
-        {
-            return BadRequest(new ProblemDetails { Title = "Product was not found." });
-        }
-
-        var customer = await dbContext.Users.SingleOrDefaultAsync(
-            candidate => candidate.Id == request.CustomerId && candidate.Role == UserRole.Customer && candidate.IsActive,
-            cancellationToken);
-        if (customer is null)
-        {
-            return BadRequest(new ProblemDetails { Title = "An active Customer account is required." });
-        }
-
-        var startDate = DateTime.SpecifyKind(request.StartDate.Date, DateTimeKind.Utc);
-        var card = new WarrantyCard
-        {
-            ProductId = product.Id,
-            CustomerId = customer.Id,
-            StartDate = startDate,
-            EndDate = startDate.AddMonths(product.WarrantyMonths),
-            Status = WarrantyStatus.Active
-        };
-        dbContext.WarrantyCards.Add(card);
-        await dbContext.SaveChangesAsync(cancellationToken);
-
-        card.Product = product;
-        card.Customer = customer;
-        return CreatedAtAction(nameof(GetById), new { id = card.Id }, ToResponse(card));
+        var card = await warrantyCardService.CreateAsync(request, role, cancellationToken);
+        return CreatedAtAction(nameof(GetById), new { id = card.Id }, card);
     }
 
-    private static WarrantyCardResponse ToResponse(WarrantyCard card) => new(
-        card.Id,
-        card.ProductId,
-        card.Product.Name,
-        card.Product.SerialNumber,
-        card.CustomerId,
-        card.Customer.FullName,
-        card.StartDate,
-        card.EndDate,
-        card.Status == WarrantyStatus.Active && card.EndDate.Date < DateTime.UtcNow.Date
-            ? WarrantyStatus.Expired
-            : card.Status);
+    private bool TryGetIdentity(out int userId, out UserRole role)
+    {
+        role = default;
+        return User.TryGetUserId(out userId) && User.TryGetUserRole(out role);
+    }
 }

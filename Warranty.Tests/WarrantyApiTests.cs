@@ -11,8 +11,12 @@ using Warranty.Controllers;
 using Warranty.Data;
 using Warranty.Dtos;
 using Warranty.Enums;
+using Warranty.Exceptions;
 using Warranty.Models;
+using Warranty.Repositories.Implementations.Important;
+using Warranty.Services.Implementations.Important;
 using Warranty.Services;
+using Warranty.Services.Interfaces.Important;
 
 namespace Warranty.Tests;
 
@@ -49,7 +53,7 @@ public sealed class WarrantyApiTests
     public async Task Register_AlwaysCreatesCustomerAndStoresOnlyPasswordHash()
     {
         await using var testDatabase = await TestDatabase.CreateAsync();
-        var controller = new AuthController(testDatabase.Context, CreateTokenService());
+        var controller = CreateAuthController(testDatabase.Context);
 
         var result = await controller.Register(new RegisterRequest
         {
@@ -70,16 +74,15 @@ public sealed class WarrantyApiTests
     public async Task Register_RejectsPasswordsOverBcryptUtf8Limit()
     {
         await using var testDatabase = await TestDatabase.CreateAsync();
-        var controller = new AuthController(testDatabase.Context, CreateTokenService());
+        var controller = CreateAuthController(testDatabase.Context);
 
-        var result = await controller.Register(new RegisterRequest
+        await Assert.ThrowsAsync<BusinessRuleException>(() => controller.Register(new RegisterRequest
         {
             FullName = "Customer One",
             Email = "person@example.com",
             Password = new string('é', 40)
-        }, CancellationToken.None);
+        }, CancellationToken.None));
 
-        Assert.IsType<BadRequestObjectResult>(result.Result);
         Assert.Empty(await testDatabase.Context.Users.ToListAsync());
     }
 
@@ -91,7 +94,7 @@ public sealed class WarrantyApiTests
         testDatabase.Context.Users.Add(user);
         await testDatabase.Context.SaveChangesAsync();
 
-        var controller = WithUser(new UsersController(testDatabase.Context), user.Id, UserRole.Technician);
+        var controller = WithUser(CreateUsersController(testDatabase.Context), user.Id, UserRole.Technician);
         await controller.UpdateMe(new UpdateMyProfileRequest
         {
             FullName = "Updated Technician",
@@ -110,16 +113,15 @@ public sealed class WarrantyApiTests
     public async Task AdminCreateUser_RejectsMissingRoleInsteadOfDefaultingToAdmin()
     {
         await using var testDatabase = await TestDatabase.CreateAsync();
-        var controller = new UsersController(testDatabase.Context);
+        var controller = CreateUsersController(testDatabase.Context);
 
-        var result = await controller.Create(new AdminCreateUserRequest
+        await Assert.ThrowsAsync<BusinessRuleException>(() => controller.Create(new AdminCreateUserRequest
         {
             FullName = "New User",
             Email = "new@example.com",
             Password = "StrongPassword123"
-        }, CancellationToken.None);
+        }, CancellationToken.None));
 
-        Assert.IsType<BadRequestObjectResult>(result.Result);
         Assert.Empty(await testDatabase.Context.Users.ToListAsync());
     }
 
@@ -145,7 +147,7 @@ public sealed class WarrantyApiTests
         });
         await testDatabase.Context.SaveChangesAsync();
 
-        var controller = WithUser(new UsersController(testDatabase.Context), customer.Id, UserRole.Customer);
+        var controller = WithUser(CreateUsersController(testDatabase.Context), customer.Id, UserRole.Customer);
         var result = await controller.DeactivateMe(CancellationToken.None);
 
         Assert.IsType<NoContentResult>(result);
@@ -162,7 +164,7 @@ public sealed class WarrantyApiTests
         user.PasswordHash = BCrypt.Net.BCrypt.HashPassword("StrongPassword123");
         testDatabase.Context.Users.Add(user);
         await testDatabase.Context.SaveChangesAsync();
-        var controller = new AuthController(testDatabase.Context, CreateTokenService());
+        var controller = CreateAuthController(testDatabase.Context);
 
         var loginResult = await controller.Login(new LoginRequest
         {
@@ -179,10 +181,9 @@ public sealed class WarrantyApiTests
         Assert.NotEqual(login.RefreshToken, refreshed.RefreshToken);
         Assert.True((await testDatabase.Context.RefreshTokens.OrderBy(token => token.Id).FirstAsync()).IsRevoked);
 
-        var reuseResult = await controller.Refresh(
+        await Assert.ThrowsAsync<UnauthorizedException>(() => controller.Refresh(
             new RefreshRequest { RefreshToken = login.RefreshToken },
-            CancellationToken.None);
-        Assert.IsType<UnauthorizedObjectResult>(reuseResult.Result);
+            CancellationToken.None));
     }
 
     [Fact]
@@ -201,7 +202,7 @@ public sealed class WarrantyApiTests
         };
         testDatabase.Context.WarrantyCards.Add(card);
         await testDatabase.Context.SaveChangesAsync();
-        var controller = WithUser(new RepairRequestsController(testDatabase.Context), customer.Id, UserRole.Customer);
+        var controller = WithUser(CreateRepairRequestsController(testDatabase.Context), customer.Id, UserRole.Customer);
 
         var result = await controller.Create(new CreateRepairRequest
         {
@@ -228,13 +229,12 @@ public sealed class WarrantyApiTests
         };
         testDatabase.Context.WarrantyCards.Add(expiredCard);
         await testDatabase.Context.SaveChangesAsync();
-        var expiredResult = await controller.Create(new CreateRepairRequest
+        await Assert.ThrowsAsync<BusinessRuleException>(() => controller.Create(new CreateRepairRequest
         {
             WarrantyCardId = expiredCard.Id,
             Description = "Expired warranty"
-        }, CancellationToken.None);
+        }, CancellationToken.None));
 
-        Assert.IsType<BadRequestObjectResult>(expiredResult.Result);
         Assert.Single(await testDatabase.Context.RepairRequests.ToListAsync());
     }
 
@@ -261,7 +261,7 @@ public sealed class WarrantyApiTests
         };
         testDatabase.Context.RepairRequests.Add(repairRequest);
         await testDatabase.Context.SaveChangesAsync();
-        var controller = WithUser(new RepairRequestsController(testDatabase.Context), technician.Id, UserRole.Technician);
+        var controller = WithUser(CreateRepairRequestsController(testDatabase.Context), technician.Id, UserRole.Technician);
 
         var result = await controller.ChangeStatus(
             repairRequest.Id,
@@ -278,11 +278,10 @@ public sealed class WarrantyApiTests
         Assert.Equal(RepairRequestStatus.InProgress, history.NewStatus);
         Assert.Equal(technician.Id, history.ChangedBy);
 
-        var prematureReturn = await controller.ChangeStatus(
+        await Assert.ThrowsAsync<BusinessRuleException>(() => controller.ChangeStatus(
             repairRequest.Id,
             new ChangeRepairStatusRequest { Status = RepairRequestStatus.Returned },
-            CancellationToken.None);
-        Assert.IsType<BadRequestObjectResult>(prematureReturn.Result);
+            CancellationToken.None));
         Assert.Equal(RepairRequestStatus.InProgress,
             (await testDatabase.Context.RepairRequests.AsNoTracking().SingleAsync()).Status);
 
@@ -308,11 +307,9 @@ public sealed class WarrantyApiTests
     public async Task ManagerCannotReadAllCustomerWarrantyCards()
     {
         await using var testDatabase = await TestDatabase.CreateAsync();
-        var controller = WithUser(new WarrantyCardsController(testDatabase.Context), 1, UserRole.Manager);
+        var controller = WithUser(CreateWarrantyCardsController(testDatabase.Context), 1, UserRole.Manager);
 
-        var result = await controller.GetAll(CancellationToken.None);
-
-        Assert.IsType<ForbidResult>(result.Result);
+        await Assert.ThrowsAsync<ForbiddenException>(() => controller.GetAll(CancellationToken.None));
     }
 
     [Fact]
@@ -359,6 +356,27 @@ public sealed class WarrantyApiTests
             .Build();
         return new TokenService(configuration);
     }
+
+    private static AuthController CreateAuthController(AppDbContext dbContext) =>
+        new(new AuthService(
+            new UserRepository(dbContext),
+            new RefreshTokenRepository(dbContext),
+            CreateTokenService()));
+
+    private static UsersController CreateUsersController(AppDbContext dbContext) =>
+        new(new UserService(new UserRepository(dbContext), new RefreshTokenRepository(dbContext)));
+
+    private static RepairRequestsController CreateRepairRequestsController(AppDbContext dbContext) =>
+        new(new RepairRequestService(
+            new RepairRequestRepository(dbContext),
+            new WarrantyCardRepository(dbContext),
+            new UserRepository(dbContext)));
+
+    private static WarrantyCardsController CreateWarrantyCardsController(AppDbContext dbContext) =>
+        new(new WarrantyCardService(
+            new WarrantyCardRepository(dbContext),
+            new ProductRepository(dbContext),
+            new UserRepository(dbContext)));
 
     private static TController WithUser<TController>(TController controller, int userId, UserRole role)
         where TController : ControllerBase

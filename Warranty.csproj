@@ -5,7 +5,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <DefaultItemExcludes>$(DefaultItemExcludes);Warranty.Tests/**</DefaultItemExcludes>
-    <DefaultItemExcludesInProjectFolder>$(DefaultItemExcludesInProjectFolder);Warranty.Tests/**</DefaultItemExcludesInProjectFolder>
+    <DefaultItemExcludesInProjectFolder>$(DefaultItemExcludesInProjectFolder);Warranty.Tests/**;**/obj/**;**/bin/**</DefaultItemExcludesInProjectFolder>
   </PropertyGroup>
 
   <ItemGroup>
