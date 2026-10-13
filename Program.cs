@@ -7,10 +7,14 @@ using Microsoft.OpenApi;
 using Warranty.Data;
 using Warranty.Middlewares;
 using Warranty.Repositories.Implementations.Important;
+using Warranty.Repositories.Implementations.Worth;
 using Warranty.Repositories.Interfaces.Important;
+using Warranty.Repositories.Interfaces.Worth;
 using Warranty.Services;
 using Warranty.Services.Implementations.Important;
+using Warranty.Services.Implementations.Worth;
 using Warranty.Services.Interfaces.Important;
+using Warranty.Services.Interfaces.Worth;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -53,12 +57,18 @@ builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IProductRepository, ProductRepository>();
 builder.Services.AddScoped<IWarrantyCardRepository, WarrantyCardRepository>();
 builder.Services.AddScoped<IRepairRequestRepository, RepairRequestRepository>();
+builder.Services.AddScoped<ICategoryRepository, CategoryRepository>();
+builder.Services.AddScoped<IPartRepository, PartRepository>();
+builder.Services.AddScoped<IRepairRequestPartRepository, RepairRequestPartRepository>();
 builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IProductService, ProductService>();
 builder.Services.AddScoped<IWarrantyCardService, WarrantyCardService>();
 builder.Services.AddScoped<IRepairRequestService, RepairRequestService>();
+builder.Services.AddScoped<ICategoryService, CategoryService>();
+builder.Services.AddScoped<IPartService, PartService>();
+builder.Services.AddScoped<IRepairRequestPartService, RepairRequestPartService>();
 builder.Services.AddScoped<IReportService, ReportService>();
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>

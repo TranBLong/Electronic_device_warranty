@@ -7,7 +7,7 @@
 | Tầng | Thư mục | Entity | Trạng thái |
 |---|---|---|---|
 | Important | `Models/Important` | User, Product, WarrantyCard, RepairRequest, RepairRequestStatusHistory, RefreshToken | ✅ Xong: Models, Dtos, Repositories, Services, Controllers |
-| Worth | `Models/Worth` | Category, Part, RepairRequestPart | 🔶 Mới có Models — còn Dtos, Repositories, Services, Controllers |
+| Worth | `Models/Worth` | Category, Part, RepairRequestPart | ✅ Xong: Models, Dtos, Repositories, Services, Controllers, Migration, Tests |
 | Complete | `Models/Complete` | ServiceCenter, Invoice, Payment, Notification, Feedback, RepairRequestAttachment | 🔶 Mới có Models — còn Dtos, Repositories, Services, Controllers |
 
 Quy ước:

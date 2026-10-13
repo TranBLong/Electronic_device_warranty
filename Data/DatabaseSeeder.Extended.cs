@@ -125,11 +125,11 @@ public static partial class DatabaseSeeder
         // ---------- Parts ----------
         var parts = new[]
         {
-            new Part { Code = "BAT-DELL-XPS13", Name = "Dell XPS 13 Replacement Battery", Description = "Original 52Wh lithium-polymer battery.", UnitPrice = 1_850_000m, StockQuantity = 12, CreatedAt = Utc(2024, 02, 20, 10, 00) },
-            new Part { Code = "DIG-IP15P-TOUCH", Name = "iPhone 15 Pro Touch Screen Digitizer", Description = "OLED display assembly with digitizer.", UnitPrice = 6_500_000m, StockQuantity = 5, CreatedAt = Utc(2024, 02, 20, 10, 10) },
-            new Part { Code = "USBC-TABS9-PORT", Name = "Galaxy Tab S9 USB-C Charging Port Board", Description = "Charging port sub-board with flex cable.", UnitPrice = 450_000m, StockQuantity = 25, CreatedAt = Utc(2024, 02, 20, 10, 20) },
-            new Part { Code = "LED-LG34-BL", Name = "LG 34-inch Monitor LED Backlight Strip", Description = "Replacement LED backlight strip set.", UnitPrice = 980_000m, StockQuantity = 8, CreatedAt = Utc(2024, 02, 20, 10, 30) },
-            new Part { Code = "KIT-SCREW-ADH", Name = "Precision Screw and Adhesive Kit", Description = "Universal screws and display adhesive seal.", UnitPrice = 120_000m, StockQuantity = 60, CreatedAt = Utc(2024, 02, 20, 10, 40) }
+            new Part { Category = categories[0], PartNumber = "BAT-DELL-XPS13", Name = "Dell XPS 13 Replacement Battery", Description = "Original 52Wh lithium-polymer battery.", UnitPrice = 1_850_000m, StockQuantity = 12, CreatedAt = Utc(2024, 02, 20, 10, 00) },
+            new Part { Category = categories[1], PartNumber = "DIG-IP15P-TOUCH", Name = "iPhone 15 Pro Touch Screen Digitizer", Description = "OLED display assembly with digitizer.", UnitPrice = 6_500_000m, StockQuantity = 5, CreatedAt = Utc(2024, 02, 20, 10, 10) },
+            new Part { Category = categories[2], PartNumber = "USBC-TABS9-PORT", Name = "Galaxy Tab S9 USB-C Charging Port Board", Description = "Charging port sub-board with flex cable.", UnitPrice = 450_000m, StockQuantity = 25, CreatedAt = Utc(2024, 02, 20, 10, 20) },
+            new Part { Category = categories[3], PartNumber = "LED-LG34-BL", Name = "LG 34-inch Monitor LED Backlight Strip", Description = "Replacement LED backlight strip set.", UnitPrice = 980_000m, StockQuantity = 8, CreatedAt = Utc(2024, 02, 20, 10, 30) },
+            new Part { Category = categories[4], PartNumber = "KIT-SCREW-ADH", Name = "Precision Screw and Adhesive Kit", Description = "Universal screws and display adhesive seal.", UnitPrice = 120_000m, StockQuantity = 60, CreatedAt = Utc(2024, 02, 20, 10, 40) }
         };
 
         dbContext.ServiceCenters.AddRange(centers);
@@ -234,11 +234,11 @@ public static partial class DatabaseSeeder
         // ---------- RepairRequestParts (giá chốt tại thời điểm sửa) ----------
         var repairParts = new[]
         {
-            new RepairRequestPart { RepairRequestId = rrBattery.Id, PartId = parts[0].Id, Quantity = 1, UnitPrice = parts[0].UnitPrice, AddedAt = Utc(2025, 01, 21, 09, 00) },
-            new RepairRequestPart { RepairRequestId = rrTouch.Id, PartId = parts[1].Id, Quantity = 1, UnitPrice = parts[1].UnitPrice, AddedAt = Utc(2025, 02, 05, 09, 20) },
-            new RepairRequestPart { RepairRequestId = rrTouch.Id, PartId = parts[4].Id, Quantity = 1, UnitPrice = parts[4].UnitPrice, AddedAt = Utc(2025, 02, 05, 09, 25) },
-            new RepairRequestPart { RepairRequestId = rrPort.Id, PartId = parts[2].Id, Quantity = 1, UnitPrice = parts[2].UnitPrice, AddedAt = Utc(2024, 07, 08, 10, 00) },
-            new RepairRequestPart { RepairRequestId = rrFlicker.Id, PartId = parts[3].Id, Quantity = 1, UnitPrice = parts[3].UnitPrice, AddedAt = Utc(2025, 04, 15, 13, 00) }
+            new RepairRequestPart { RepairRequestId = rrBattery.Id, PartId = parts[0].Id, Quantity = 1, UnitPrice = parts[0].UnitPrice, UsedAt = Utc(2025, 01, 21, 09, 00) },
+            new RepairRequestPart { RepairRequestId = rrTouch.Id, PartId = parts[1].Id, Quantity = 1, UnitPrice = parts[1].UnitPrice, UsedAt = Utc(2025, 02, 05, 09, 20) },
+            new RepairRequestPart { RepairRequestId = rrTouch.Id, PartId = parts[4].Id, Quantity = 1, UnitPrice = parts[4].UnitPrice, UsedAt = Utc(2025, 02, 05, 09, 25) },
+            new RepairRequestPart { RepairRequestId = rrPort.Id, PartId = parts[2].Id, Quantity = 1, UnitPrice = parts[2].UnitPrice, UsedAt = Utc(2024, 07, 08, 10, 00) },
+            new RepairRequestPart { RepairRequestId = rrFlicker.Id, PartId = parts[3].Id, Quantity = 1, UnitPrice = parts[3].UnitPrice, UsedAt = Utc(2025, 04, 15, 13, 00) }
         };
 
         dbContext.RepairRequestParts.AddRange(repairParts);

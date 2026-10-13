@@ -195,10 +195,8 @@ namespace Warranty.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<string>("Code")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
+                    b.Property<int>("CategoryId")
+                        .HasColumnType("int");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
@@ -215,6 +213,11 @@ namespace Warranty.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
 
+                    b.Property<string>("PartNumber")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
                     b.Property<int>("StockQuantity")
                         .HasColumnType("int");
 
@@ -224,7 +227,9 @@ namespace Warranty.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Code")
+                    b.HasIndex("CategoryId");
+
+                    b.HasIndex("PartNumber")
                         .IsUnique();
 
                     b.ToTable("Parts", t =>
@@ -470,9 +475,6 @@ namespace Warranty.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<DateTime>("AddedAt")
-                        .HasColumnType("datetime2");
-
                     b.Property<int>("PartId")
                         .HasColumnType("int");
 
@@ -486,12 +488,14 @@ namespace Warranty.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
+                    b.Property<DateTime>("UsedAt")
+                        .HasColumnType("datetime2");
+
                     b.HasKey("Id");
 
                     b.HasIndex("PartId");
 
-                    b.HasIndex("RepairRequestId", "PartId")
-                        .IsUnique();
+                    b.HasIndex("RepairRequestId", "PartId");
 
                     b.ToTable("RepairRequestParts", t =>
                         {
@@ -706,6 +710,17 @@ namespace Warranty.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("Warranty.Models.Part", b =>
+                {
+                    b.HasOne("Warranty.Models.Category", "Category")
+                        .WithMany("Parts")
+                        .HasForeignKey("CategoryId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Category");
+                });
+
             modelBuilder.Entity("Warranty.Models.Payment", b =>
                 {
                     b.HasOne("Warranty.Models.Invoice", "Invoice")
@@ -866,6 +881,8 @@ namespace Warranty.Migrations
 
             modelBuilder.Entity("Warranty.Models.Category", b =>
                 {
+                    b.Navigation("Parts");
+
                     b.Navigation("Products");
                 });
 

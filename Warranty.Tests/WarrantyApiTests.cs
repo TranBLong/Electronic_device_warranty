@@ -23,7 +23,7 @@ namespace Warranty.Tests;
 public sealed class WarrantyApiTests
 {
     [Fact]
-    public async Task SeedAsync_InsertsFiveRecordsPerTableUsingGeneratedIds()
+    public async Task SeedAsync_InsertsRecordsUsingGeneratedIds()
     {
         await using var testDatabase = await TestDatabase.CreateAsync();
 
@@ -32,8 +32,8 @@ public sealed class WarrantyApiTests
         Assert.Equal(5, await testDatabase.Context.Users.CountAsync());
         Assert.Equal(5, await testDatabase.Context.Products.CountAsync());
         Assert.Equal(5, await testDatabase.Context.WarrantyCards.CountAsync());
-        Assert.Equal(5, await testDatabase.Context.RepairRequests.CountAsync());
-        Assert.Equal(5, await testDatabase.Context.RepairRequestStatusHistories.CountAsync());
+        Assert.Equal(8, await testDatabase.Context.RepairRequests.CountAsync());
+        Assert.Equal(8, await testDatabase.Context.RepairRequestStatusHistories.CountAsync());
         Assert.Equal(5, await testDatabase.Context.RefreshTokens.CountAsync());
         Assert.All(await testDatabase.Context.Users.Select(user => user.Id).ToListAsync(), id => Assert.True(id > 0));
         Assert.All(await testDatabase.Context.Products.Select(product => product.Id).ToListAsync(), id => Assert.True(id > 0));

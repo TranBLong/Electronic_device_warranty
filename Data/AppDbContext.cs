@@ -114,11 +114,13 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<Part>(entity =>
         {
             entity.HasKey(part => part.Id);
-            entity.Property(part => part.Code).HasMaxLength(50).IsRequired();
+            entity.Property(part => part.PartNumber).HasMaxLength(50).IsRequired();
             entity.Property(part => part.Name).HasMaxLength(200).IsRequired();
             entity.Property(part => part.Description).HasMaxLength(1000);
             entity.Property(part => part.UnitPrice).HasPrecision(18, 2);
-            entity.HasIndex(part => part.Code).IsUnique();
+            entity.HasIndex(part => part.PartNumber).IsUnique();
+            entity.HasOne(part => part.Category).WithMany(category => category.Parts)
+                .HasForeignKey(part => part.CategoryId).OnDelete(DeleteBehavior.Restrict);
             entity.ToTable(table =>
             {
                 table.HasCheckConstraint("CK_Parts_UnitPrice", "[UnitPrice] >= 0");
@@ -130,7 +132,7 @@ public class AppDbContext : DbContext
         {
             entity.HasKey(item => item.Id);
             entity.Property(item => item.UnitPrice).HasPrecision(18, 2);
-            entity.HasIndex(item => new { item.RepairRequestId, item.PartId }).IsUnique();
+            entity.HasIndex(item => new { item.RepairRequestId, item.PartId });
             entity.HasOne(item => item.RepairRequest).WithMany(request => request.Parts)
                 .HasForeignKey(item => item.RepairRequestId).OnDelete(DeleteBehavior.Cascade);
             entity.HasOne(item => item.Part).WithMany(part => part.RepairRequestParts)
