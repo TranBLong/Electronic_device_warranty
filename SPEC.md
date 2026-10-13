@@ -8,7 +8,7 @@
 |---|---|---|---|
 | Important | `Models/Important` | User, Product, WarrantyCard, RepairRequest, RepairRequestStatusHistory, RefreshToken | ✅ Xong: Models, Dtos, Repositories, Services, Controllers |
 | Worth | `Models/Worth` | Category, Part, RepairRequestPart | ✅ Xong: Models, Dtos, Repositories, Services, Controllers, Migration, Tests |
-| Complete | `Models/Complete` | ServiceCenter, Invoice, Payment, Notification, Feedback, RepairRequestAttachment | 🔶 Mới có Models — còn Dtos, Repositories, Services, Controllers |
+| Complete | `Models/Complete` | ServiceCenter, Invoice, Payment, Notification, Feedback, RepairRequestAttachment | ✅ Xong: Models, Dtos, Repositories, Services, Controllers, Migration, Tests |
 
 Quy ước:
 - Hoàn thành xong tầng trước mới làm tầng sau. Entity của tầng sau được phép tham chiếu entity tầng trước, **không** ngược lại (trừ các FK nullable được ghi rõ bên dưới).
@@ -161,7 +161,7 @@ Lưu ý riêng của tầng:
 
 ## Luồng nghiệp vụ
 8. **Trung tâm bảo hành**: Manager quản lý `ServiceCenter`; `RepairRequest` có thể gắn với một trung tâm.
-9. **Lập hóa đơn**: Khi `RepairRequest` đạt `Completed`, Receptionist lập `Invoice` (tổng = tổng `Quantity * UnitPrice` của `RepairRequestPart`; trường hợp trong bảo hành có thể là 0).
+9. **Lập hóa đơn**: Khi `RepairRequest` đạt `Completed` hoặc `Returned`, Receptionist lập `Invoice` (tổng = tổng `Quantity * UnitPrice` của `RepairRequestPart`; trường hợp trong bảo hành có thể là 0).
 10. **Thanh toán**: Receptionist ghi nhận `Payment`; khi tổng `Payment.Amount` >= `Invoice.TotalAmount` thì `Invoice.Status = Paid`.
 11. **Thông báo**: Hệ thống tạo `Notification` cho Customer mỗi khi `RepairRequest` đổi trạng thái.
 12. **Đánh giá**: Sau khi `Returned`, Customer gửi `Feedback` (1 lần cho mỗi `RepairRequest`).
@@ -189,8 +189,9 @@ Lưu ý riêng của tầng:
 Lưu ý riêng của tầng:
 - Tạo `Notification` được gọi từ `RepairRequestService` (tầng Important) khi đổi trạng thái — cùng transaction với việc ghi `RepairRequestStatusHistory`.
 - Ghi `Payment` + cập nhật `Invoice.Status` phải trong **cùng 1 transaction**.
-- Cần migration thêm `RepairRequest.ServiceCenterId` (nullable).
-- Upload file: kiểm tra định dạng và dung lượng ở Service; lưu file ngoài `wwwroot` công khai nếu có thể, chỉ lưu `FilePath` trong DB.
+- `RepairRequest.ServiceCenterId` là nullable; schema hiện có các bảng Complete và migration `AddCompleteTier` bổ sung các FK bắt buộc cho Manager/Invoice issuer cùng chính sách xóa an toàn.
+- Hóa đơn 0 đồng tự chuyển sang `Paid`; không tạo Payment cho hóa đơn này.
+- Upload file: chỉ nhận JPG/JPEG/PNG/PDF, kiểm tra signature, giới hạn dung lượng và thư mục lưu được cấu hình trong `Upload`; file nằm ngoài `wwwroot` và DB chỉ lưu đường dẫn tương đối.
 
 ---
 

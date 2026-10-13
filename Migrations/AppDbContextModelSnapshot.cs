@@ -106,6 +106,9 @@ namespace Warranty.Migrations
                     b.Property<DateTime>("IssuedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<int>("IssuedById")
+                        .HasColumnType("int");
+
                     b.Property<decimal>("LaborTotal")
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
@@ -133,6 +136,8 @@ namespace Warranty.Migrations
 
                     b.HasIndex("InvoiceNumber")
                         .IsUnique();
+
+                    b.HasIndex("IssuedById");
 
                     b.HasIndex("RepairRequestId")
                         .IsUnique();
@@ -557,6 +562,9 @@ namespace Warranty.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 
+                    b.Property<int>("ManagerId")
+                        .HasColumnType("int");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -567,6 +575,8 @@ namespace Warranty.Migrations
                         .HasColumnType("nvarchar(30)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("ManagerId");
 
                     b.HasIndex("Name")
                         .IsUnique();
@@ -683,11 +693,19 @@ namespace Warranty.Migrations
 
             modelBuilder.Entity("Warranty.Models.Invoice", b =>
                 {
+                    b.HasOne("Warranty.Models.User", "IssuedBy")
+                        .WithMany("IssuedInvoices")
+                        .HasForeignKey("IssuedById")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("Warranty.Models.RepairRequest", "RepairRequest")
                         .WithOne("Invoice")
                         .HasForeignKey("Warranty.Models.Invoice", "RepairRequestId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.Navigation("IssuedBy");
 
                     b.Navigation("RepairRequest");
                 });
@@ -702,7 +720,7 @@ namespace Warranty.Migrations
                     b.HasOne("Warranty.Models.User", "User")
                         .WithMany("Notifications")
                         .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("RepairRequest");
@@ -850,6 +868,17 @@ namespace Warranty.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("Warranty.Models.ServiceCenter", b =>
+                {
+                    b.HasOne("Warranty.Models.User", "Manager")
+                        .WithMany("ManagedServiceCenters")
+                        .HasForeignKey("ManagerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Manager");
+                });
+
             modelBuilder.Entity("Warranty.Models.User", b =>
                 {
                     b.HasOne("Warranty.Models.ServiceCenter", "ServiceCenter")
@@ -930,6 +959,10 @@ namespace Warranty.Migrations
                     b.Navigation("CreatedRepairRequests");
 
                     b.Navigation("Feedbacks");
+
+                    b.Navigation("IssuedInvoices");
+
+                    b.Navigation("ManagedServiceCenters");
 
                     b.Navigation("Notifications");
 

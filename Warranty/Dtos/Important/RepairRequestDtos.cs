@@ -8,6 +8,9 @@ public sealed class CreateRepairRequest
     [Range(1, int.MaxValue)]
     public int WarrantyCardId { get; init; }
 
+    [Range(1, int.MaxValue)]
+    public int? ServiceCenterId { get; init; }
+
     [Required, StringLength(4000)]
     public string Description { get; init; } = string.Empty;
 }
@@ -43,6 +46,7 @@ public sealed record RepairRequestResponse(
     RepairRequestStatus Status,
     DateTime CreatedAt,
     DateTime UpdatedAt,
+    int? ServiceCenterId,
     IReadOnlyList<RepairStatusHistoryResponse> StatusHistory);
 
 public sealed record DashboardSummaryResponse(

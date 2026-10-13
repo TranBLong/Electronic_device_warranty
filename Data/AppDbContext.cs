@@ -147,6 +147,8 @@ public class AppDbContext : DbContext
             entity.Property(center => center.Address).HasMaxLength(500).IsRequired();
             entity.Property(center => center.Phone).HasMaxLength(30);
             entity.HasIndex(center => center.Name).IsUnique();
+            entity.HasOne(center => center.Manager).WithMany(user => user.ManagedServiceCenters)
+                .HasForeignKey(center => center.ManagerId).OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<Invoice>(entity =>
@@ -161,6 +163,8 @@ public class AppDbContext : DbContext
             entity.HasIndex(invoice => invoice.RepairRequestId).IsUnique(); // 1 phiếu sửa - 1 hóa đơn
             entity.HasOne(invoice => invoice.RepairRequest).WithOne(request => request.Invoice)
                 .HasForeignKey<Invoice>(invoice => invoice.RepairRequestId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(invoice => invoice.IssuedBy).WithMany(user => user.IssuedInvoices)
+                .HasForeignKey(invoice => invoice.IssuedById).OnDelete(DeleteBehavior.Restrict);
             entity.ToTable(table => table.HasCheckConstraint("CK_Invoices_TotalAmount", "[TotalAmount] >= 0"));
         });
 
@@ -170,6 +174,7 @@ public class AppDbContext : DbContext
             entity.Property(payment => payment.Amount).HasPrecision(18, 2);
             entity.Property(payment => payment.Method).HasConversion<string>().HasMaxLength(30);
             entity.Property(payment => payment.Note).HasMaxLength(500);
+            entity.HasIndex(payment => payment.InvoiceId);
             entity.HasOne(payment => payment.Invoice).WithMany(invoice => invoice.Payments)
                 .HasForeignKey(payment => payment.InvoiceId).OnDelete(DeleteBehavior.Cascade);
             entity.HasOne(payment => payment.ReceivedBy).WithMany()
@@ -185,7 +190,7 @@ public class AppDbContext : DbContext
             entity.Property(notification => notification.Message).HasMaxLength(1000).IsRequired();
             entity.HasIndex(notification => new { notification.UserId, notification.IsRead });
             entity.HasOne(notification => notification.User).WithMany(user => user.Notifications)
-                .HasForeignKey(notification => notification.UserId).OnDelete(DeleteBehavior.Cascade);
+                .HasForeignKey(notification => notification.UserId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(notification => notification.RepairRequest).WithMany(request => request.Notifications)
                 .HasForeignKey(notification => notification.RepairRequestId).OnDelete(DeleteBehavior.SetNull);
         });

@@ -57,6 +57,17 @@ public sealed class RepairRequestRepository(AppDbContext dbContext) : IRepairReq
     public async Task SaveChangesAsync(CancellationToken cancellationToken = default) =>
         await dbContext.SaveChangesAsync(cancellationToken);
 
+    public async Task SaveStatusChangeAsync(
+        RepairRequest repairRequest,
+        Notification notification,
+        CancellationToken cancellationToken = default)
+    {
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        dbContext.Notifications.Add(notification);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+    }
+
     private static IQueryable<RepairRequest> WithDetails(IQueryable<RepairRequest> query) =>
         query.Include(request => request.WarrantyCard)
             .ThenInclude(card => card.Customer)

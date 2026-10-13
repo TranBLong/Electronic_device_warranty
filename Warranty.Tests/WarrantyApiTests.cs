@@ -14,6 +14,7 @@ using Warranty.Enums;
 using Warranty.Exceptions;
 using Warranty.Models;
 using Warranty.Repositories.Implementations.Important;
+using Warranty.Repositories.Implementations.Complete;
 using Warranty.Services.Implementations.Important;
 using Warranty.Services;
 using Warranty.Services.Interfaces.Important;
@@ -370,7 +371,8 @@ public sealed class WarrantyApiTests
         new(new RepairRequestService(
             new RepairRequestRepository(dbContext),
             new WarrantyCardRepository(dbContext),
-            new UserRepository(dbContext)));
+            new UserRepository(dbContext),
+            new ServiceCenterRepository(dbContext)));
 
     private static WarrantyCardsController CreateWarrantyCardsController(AppDbContext dbContext) =>
         new(new WarrantyCardService(

@@ -40,12 +40,25 @@ All routes other than registration, login, and refresh require a valid bearer ac
 | GET/POST | `/api/repair-requests` | Customer/Technician scoped to own records; Admin/Manager/Receptionist see all; Customer or Receptionist creates |
 | PUT | `/api/repair-requests/{id}/technician` | Receptionist or Manager |
 | PUT | `/api/repair-requests/{id}/status` | Assigned Technician |
+| PATCH | `/api/repair-requests/{id}/service-center` | Receptionist, Manager, or Admin |
+| GET/POST/PUT/PATCH/DELETE | `/api/service-centers`, `/api/service-centers/{id}` | Authenticated read; Manager/Admin write |
+| POST | `/api/repair-requests/{repairRequestId}/invoice` | Receptionist; Completed/Returned repair requests |
+| GET | `/api/invoices`, `/api/invoices/{id}`, `/api/repair-requests/{repairRequestId}/invoice` | Admin/Manager/Receptionist; Customer sees own invoices |
+| GET | `/api/invoices/my` | Customer |
+| PATCH | `/api/invoices/{id}/cancel` | Receptionist or Manager |
+| POST/GET | `/api/invoices/{invoiceId}/payments` | Receptionist records; Customer sees own payments |
+| GET | `/api/notifications`, `/api/notifications/unread-count` | Authenticated; own notifications |
+| PATCH | `/api/notifications/{id}/read`, `/api/notifications/read-all` | Authenticated; own notifications |
+| POST/GET | `/api/repair-requests/{repairRequestId}/feedback` | Customer submits/reads own; Admin/Manager read |
+| GET | `/api/feedbacks` | Admin or Manager |
+| POST/GET | `/api/repair-requests/{repairRequestId}/attachments` | Customer owner, Receptionist, assigned Technician; authorized staff read |
+| GET | `/api/attachments/{id}/download` | Same ownership/assignment checks as attachment listing |
 | GET | `/api/reports/summary` | Admin or Manager |
 
 Customer registration cannot choose a role. Profile updates accept only FullName, Email, and Phone. Account deactivation sets `IsActive = false`, revokes refresh tokens, blocks future authenticated requests, and preserves referenced records.
 
-Repair requests created by a Customer have a null `ReceptionistId`; receptionist-created requests store the authenticated Receptionist. Warranty eligibility is checked using both persisted status and end date. Every request creation records its initial `Received` state, and every subsequent status change adds a history row in the same save operation.
+Repair requests created by a Customer have a null `ReceptionistId`; receptionist-created requests store the authenticated Receptionist. Warranty eligibility is checked using both persisted status and end date. Every request creation records its initial `Received` state, and every subsequent status change adds a history row and a Customer notification in the same transaction. Attachments are stored outside `wwwroot`; `Upload:MaxFileSizeBytes`, `Upload:AllowedExtensions`, and `Upload:RootPath` configure upload validation and storage. The optional SQL sample-center seed is [`scripts/seed-service-centers.sql`](./scripts/seed-service-centers.sql).
 
 ## Scope
 
-The API implements User, Product, WarrantyCard, RepairRequest, RepairRequestStatusHistory, and RefreshToken. ServiceCenter, SparePart, Invoice/Payment, Notification, Feedback, and AuditLog are not included.
+The API implements the Important, Worth, and Complete tiers, including ServiceCenter, Invoice/Payment, Notification, Feedback, and RepairRequestAttachment. AuditLog is not included.

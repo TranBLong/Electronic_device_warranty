@@ -74,6 +74,7 @@ public static partial class DatabaseSeeder
             {
                 Name = "E-Warranty Service Center Hue",
                 Address = "12 Le Loi, Phu Hoi, Hue",
+                ManagerId = manager.Id,
                 Phone = "02343822001",
                 IsActive = true,
                 CreatedAt = Utc(2024, 01, 10, 08, 00)
@@ -82,6 +83,7 @@ public static partial class DatabaseSeeder
             {
                 Name = "E-Warranty Service Center Da Nang",
                 Address = "254 Nguyen Van Linh, Thanh Khe, Da Nang",
+                ManagerId = manager.Id,
                 Phone = "02363650111",
                 IsActive = true,
                 CreatedAt = Utc(2024, 01, 10, 08, 30)
@@ -90,6 +92,7 @@ public static partial class DatabaseSeeder
             {
                 Name = "E-Warranty Service Center Ha Noi",
                 Address = "18 Tran Duy Hung, Cau Giay, Ha Noi",
+                ManagerId = manager.Id,
                 Phone = "02435550123",
                 IsActive = true,
                 CreatedAt = Utc(2024, 02, 01, 09, 00)
@@ -98,6 +101,7 @@ public static partial class DatabaseSeeder
             {
                 Name = "E-Warranty Service Center Ho Chi Minh",
                 Address = "72 Nguyen Hue, District 1, Ho Chi Minh City",
+                ManagerId = manager.Id,
                 Phone = "02838220456",
                 IsActive = true,
                 CreatedAt = Utc(2024, 02, 15, 09, 30)
@@ -106,6 +110,7 @@ public static partial class DatabaseSeeder
             {
                 Name = "E-Warranty Service Center Can Tho",
                 Address = "35 Mau Than, Ninh Kieu, Can Tho",
+                ManagerId = manager.Id,
                 Phone = "02923810789",
                 IsActive = false, // đang tạm đóng cửa
                 CreatedAt = Utc(2024, 03, 05, 10, 00)
@@ -255,6 +260,7 @@ public static partial class DatabaseSeeder
                 LaborTotal = 0m,
                 TotalAmount = 0m, // trong bảo hành, miễn phí
                 Status = InvoiceStatus.Paid,
+                IssuedById = receptionist.Id,
                 IssuedAt = Utc(2025, 01, 20, 08, 50),
                 PaidAt = Utc(2025, 01, 20, 08, 50)
             },
@@ -266,6 +272,7 @@ public static partial class DatabaseSeeder
                 LaborTotal = 300_000m,
                 TotalAmount = 6_920_000m,
                 Status = InvoiceStatus.Unpaid, // mới đặt cọc 4.000.000
+                IssuedById = receptionist.Id,
                 IssuedAt = Utc(2025, 02, 02, 11, 00),
                 PaidAt = null
             },
@@ -277,6 +284,7 @@ public static partial class DatabaseSeeder
                 LaborTotal = 150_000m,
                 TotalAmount = 600_000m,
                 Status = InvoiceStatus.Paid,
+                IssuedById = receptionist.Id,
                 IssuedAt = Utc(2024, 07, 05, 15, 00),
                 PaidAt = Utc(2024, 07, 11, 16, 30)
             },
@@ -288,6 +296,7 @@ public static partial class DatabaseSeeder
                 LaborTotal = 200_000m,
                 TotalAmount = 1_180_000m,
                 Status = InvoiceStatus.Paid,
+                IssuedById = receptionist.Id,
                 IssuedAt = Utc(2025, 04, 18, 16, 45),
                 PaidAt = Utc(2025, 04, 18, 17, 00)
             },
@@ -299,6 +308,7 @@ public static partial class DatabaseSeeder
                 LaborTotal = 0m,
                 TotalAmount = 0m,
                 Status = InvoiceStatus.Cancelled, // phiếu sửa đã hủy
+                IssuedById = receptionist.Id,
                 IssuedAt = Utc(2023, 04, 28, 13, 50),
                 PaidAt = null
             }
@@ -310,11 +320,11 @@ public static partial class DatabaseSeeder
         // ---------- Payments ----------
         var payments = new[]
         {
-            new Payment { InvoiceId = invoices[1].Id, ReceivedById = receptionist.Id, Amount = 2_000_000m, Method = PaymentMethod.BankTransfer, Note = "Deposit at drop-off.", PaidAt = Utc(2025, 02, 02, 11, 30) },
+            new Payment { InvoiceId = invoices[1].Id, ReceivedById = receptionist.Id, Amount = 2_000_000m, Method = PaymentMethod.Transfer, Note = "Deposit at drop-off.", PaidAt = Utc(2025, 02, 02, 11, 30) },
             new Payment { InvoiceId = invoices[1].Id, ReceivedById = receptionist.Id, Amount = 2_000_000m, Method = PaymentMethod.Card, Note = "Second deposit after parts ordered.", PaidAt = Utc(2025, 02, 05, 09, 30) },
             new Payment { InvoiceId = invoices[2].Id, ReceivedById = receptionist.Id, Amount = 300_000m, Method = PaymentMethod.Cash, Note = "Deposit at drop-off.", PaidAt = Utc(2024, 07, 05, 15, 10) },
-            new Payment { InvoiceId = invoices[2].Id, ReceivedById = receptionist.Id, Amount = 300_000m, Method = PaymentMethod.BankTransfer, Note = "Remaining balance on completion.", PaidAt = Utc(2024, 07, 11, 16, 30) },
-            new Payment { InvoiceId = invoices[3].Id, ReceivedById = receptionist.Id, Amount = 1_180_000m, Method = PaymentMethod.BankTransfer, Note = "Full payment on pickup.", PaidAt = Utc(2025, 04, 18, 17, 00) }
+            new Payment { InvoiceId = invoices[2].Id, ReceivedById = receptionist.Id, Amount = 300_000m, Method = PaymentMethod.Transfer, Note = "Remaining balance on completion.", PaidAt = Utc(2024, 07, 11, 16, 30) },
+            new Payment { InvoiceId = invoices[3].Id, ReceivedById = receptionist.Id, Amount = 1_180_000m, Method = PaymentMethod.Transfer, Note = "Full payment on pickup.", PaidAt = Utc(2025, 04, 18, 17, 00) }
         };
 
         dbContext.Payments.AddRange(payments);

@@ -81,6 +81,22 @@ public sealed class RepairRequestsController(IRepairRequestService repairRequest
             id, request.Status, technicianId, role, cancellationToken));
     }
 
+    [Authorize(Roles = "Receptionist,Manager,Admin")]
+    [HttpPatch("{id:int}/service-center")]
+    public async Task<ActionResult<RepairRequestResponse>> AssignServiceCenter(
+        int id,
+        RepairRequestServiceCenterDto request,
+        CancellationToken cancellationToken)
+    {
+        if (!User.TryGetUserRole(out var role))
+        {
+            return Unauthorized();
+        }
+
+        return Ok(await repairRequestService.AssignServiceCenterAsync(
+            id, request.ServiceCenterId, role, cancellationToken));
+    }
+
     private bool TryGetIdentity(out int userId, out UserRole role)
     {
         role = default;

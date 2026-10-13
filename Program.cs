@@ -8,13 +8,17 @@ using Warranty.Data;
 using Warranty.Middlewares;
 using Warranty.Repositories.Implementations.Important;
 using Warranty.Repositories.Implementations.Worth;
+using Warranty.Repositories.Implementations.Complete;
 using Warranty.Repositories.Interfaces.Important;
 using Warranty.Repositories.Interfaces.Worth;
+using Warranty.Repositories.Interfaces.Complete;
 using Warranty.Services;
 using Warranty.Services.Implementations.Important;
 using Warranty.Services.Implementations.Worth;
+using Warranty.Services.Implementations.Complete;
 using Warranty.Services.Interfaces.Important;
 using Warranty.Services.Interfaces.Worth;
+using Warranty.Services.Interfaces.Complete;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -60,6 +64,12 @@ builder.Services.AddScoped<IRepairRequestRepository, RepairRequestRepository>();
 builder.Services.AddScoped<ICategoryRepository, CategoryRepository>();
 builder.Services.AddScoped<IPartRepository, PartRepository>();
 builder.Services.AddScoped<IRepairRequestPartRepository, RepairRequestPartRepository>();
+builder.Services.AddScoped<IServiceCenterRepository, ServiceCenterRepository>();
+builder.Services.AddScoped<INotificationRepository, NotificationRepository>();
+builder.Services.AddScoped<IInvoiceRepository, InvoiceRepository>();
+builder.Services.AddScoped<IPaymentRepository, PaymentRepository>();
+builder.Services.AddScoped<IFeedbackRepository, FeedbackRepository>();
+builder.Services.AddScoped<IRepairRequestAttachmentRepository, RepairRequestAttachmentRepository>();
 builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IUserService, UserService>();
@@ -69,6 +79,12 @@ builder.Services.AddScoped<IRepairRequestService, RepairRequestService>();
 builder.Services.AddScoped<ICategoryService, CategoryService>();
 builder.Services.AddScoped<IPartService, PartService>();
 builder.Services.AddScoped<IRepairRequestPartService, RepairRequestPartService>();
+builder.Services.AddScoped<IServiceCenterService, ServiceCenterService>();
+builder.Services.AddScoped<INotificationService, NotificationService>();
+builder.Services.AddScoped<IInvoiceService, InvoiceService>();
+builder.Services.AddScoped<IPaymentService, PaymentService>();
+builder.Services.AddScoped<IFeedbackService, FeedbackService>();
+builder.Services.AddScoped<IRepairRequestAttachmentService, RepairRequestAttachmentService>();
 builder.Services.AddScoped<IReportService, ReportService>();
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>

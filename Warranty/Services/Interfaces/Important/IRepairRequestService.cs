@@ -24,6 +24,11 @@ public interface IRepairRequestService
         int technicianId,
         UserRole role,
         CancellationToken cancellationToken = default);
+    Task<RepairRequestResponse> AssignServiceCenterAsync(
+        int id,
+        int serviceCenterId,
+        UserRole role,
+        CancellationToken cancellationToken = default);
     Task<RepairRequestResponse> ChangeStatusAsync(
         int id,
         RepairRequestStatus status,

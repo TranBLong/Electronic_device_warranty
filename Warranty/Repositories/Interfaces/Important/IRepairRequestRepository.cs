@@ -17,4 +17,8 @@ public interface IRepairRequestRepository
     Task<int> CountByStatusAsync(RepairRequestStatus status, CancellationToken cancellationToken = default);
     Task AddAsync(RepairRequest repairRequest, CancellationToken cancellationToken = default);
     Task SaveChangesAsync(CancellationToken cancellationToken = default);
+    Task SaveStatusChangeAsync(
+        RepairRequest repairRequest,
+        Notification notification,
+        CancellationToken cancellationToken = default);
 }

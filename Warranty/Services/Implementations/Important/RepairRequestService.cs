@@ -3,6 +3,7 @@ using Warranty.Enums;
 using Warranty.Exceptions;
 using Warranty.Models;
 using Warranty.Repositories.Interfaces.Important;
+using Warranty.Repositories.Interfaces.Complete;
 using Warranty.Services.Interfaces.Important;
 
 namespace Warranty.Services.Implementations.Important;
@@ -10,7 +11,8 @@ namespace Warranty.Services.Implementations.Important;
 public sealed class RepairRequestService(
     IRepairRequestRepository repairRequestRepository,
     IWarrantyCardRepository warrantyCardRepository,
-    IUserRepository userRepository) : IRepairRequestService
+    IUserRepository userRepository,
+    IServiceCenterRepository serviceCenterRepository) : IRepairRequestService
 {
     public async Task<IReadOnlyList<RepairRequestResponse>> GetAllAsync(
         int userId,
@@ -62,9 +64,20 @@ public sealed class RepairRequestService(
             throw new BusinessRuleException("Repair requests require an active, unexpired warranty.");
         }
 
+        if (request.ServiceCenterId.HasValue)
+        {
+            var center = await serviceCenterRepository.GetByIdAsync(
+                request.ServiceCenterId.Value, cancellationToken: cancellationToken);
+            if (center is null || !center.IsActive)
+            {
+                throw new BusinessRuleException("An active service center is required.");
+            }
+        }
+
         var repairRequest = new RepairRequest
         {
             WarrantyCardId = card.Id,
+            ServiceCenterId = request.ServiceCenterId,
             ReceptionistId = role == UserRole.Receptionist ? actorId : null,
             Description = request.Description.Trim(),
             Status = RepairRequestStatus.Received
@@ -79,6 +92,32 @@ public sealed class RepairRequestService(
         await repairRequestRepository.AddAsync(repairRequest, cancellationToken);
         await repairRequestRepository.SaveChangesAsync(cancellationToken);
         return ToResponse(await GetRequestAsync(repairRequest.Id, cancellationToken));
+    }
+
+    public async Task<RepairRequestResponse> AssignServiceCenterAsync(
+        int id,
+        int serviceCenterId,
+        UserRole role,
+        CancellationToken cancellationToken = default)
+    {
+        if (role is not (UserRole.Receptionist or UserRole.Manager or UserRole.Admin))
+        {
+            throw new ForbiddenException("Only Receptionists, Managers and Admins can assign a service center.");
+        }
+
+        var center = await serviceCenterRepository.GetByIdAsync(serviceCenterId, cancellationToken: cancellationToken)
+            ?? throw new NotFoundException("Service center was not found.");
+        if (!center.IsActive)
+        {
+            throw new BusinessRuleException("The service center is inactive.");
+        }
+
+        var request = await GetRequestAsync(id, cancellationToken, tracking: true);
+        request.ServiceCenterId = center.Id;
+        request.ServiceCenter = center;
+        request.UpdatedAt = DateTime.UtcNow;
+        await repairRequestRepository.SaveChangesAsync(cancellationToken);
+        return ToResponse(request);
     }
 
     public async Task<RepairRequestResponse> AssignTechnicianAsync(
@@ -153,7 +192,17 @@ public sealed class RepairRequestService(
             NewStatus = status,
             ChangedBy = technicianId
         });
-        await repairRequestRepository.SaveChangesAsync(cancellationToken);
+        await repairRequestRepository.SaveStatusChangeAsync(
+            request,
+            new Notification
+            {
+                UserId = request.WarrantyCard.CustomerId,
+                RepairRequestId = request.Id,
+                Type = NotificationType.RepairStatusChanged,
+                Title = $"Repair request #{request.Id} status updated",
+                Message = $"Repair request #{request.Id} status changed to {status}."
+            },
+            cancellationToken);
         return ToResponse(request);
     }
 
@@ -196,6 +245,7 @@ public sealed class RepairRequestService(
         request.Status,
         request.CreatedAt,
         request.UpdatedAt,
+        request.ServiceCenterId,
         request.StatusHistory
             .OrderBy(history => history.ChangedAt)
             .Select(history => new RepairStatusHistoryResponse(

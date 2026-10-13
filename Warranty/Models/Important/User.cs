@@ -15,6 +15,8 @@ public class User
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public ServiceCenter? ServiceCenter { get; set; }
+    public ICollection<ServiceCenter> ManagedServiceCenters { get; set; } = new List<ServiceCenter>();
+    public ICollection<Invoice> IssuedInvoices { get; set; } = new List<Invoice>();
     public ICollection<WarrantyCard> WarrantyCards { get; set; } = new List<WarrantyCard>();
     public ICollection<RepairRequest> CreatedRepairRequests { get; set; } = new List<RepairRequest>();
     public ICollection<RepairRequest> AssignedRepairRequests { get; set; } = new List<RepairRequest>();
