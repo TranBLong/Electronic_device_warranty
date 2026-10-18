@@ -25,16 +25,18 @@ public sealed class CompleteServiceTests
     public async Task CreateInvoice_AllowsCompletedOrReturnedAndCalculatesPartTotal(RepairRequestStatus status)
     {
         await using var database = await TestDatabase.CreateAsync();
+        database.RepairRequest.IsChargeable = true;
+        await database.Context.SaveChangesAsync();
         await database.SetRepairRequestStatusAsync(status);
 
         var invoice = await database.CreateInvoiceService().CreateAsync(
             database.RepairRequest.Id,
-            new InvoiceCreateDto(),
             database.Receptionist.Id,
             UserRole.Receptionist);
 
         Assert.Equal(25m, invoice.TotalAmount);
         Assert.Equal(25m, invoice.PartsTotal);
+        Assert.Equal(0m, invoice.LaborTotal);
         Assert.Single(invoice.Lines);
         Assert.Equal(25m, invoice.Lines[0].LineTotal);
         Assert.Equal(InvoiceStatus.Unpaid, invoice.Status);
@@ -46,7 +48,7 @@ public sealed class CompleteServiceTests
         await using var database = await TestDatabase.CreateAsync();
 
         await Assert.ThrowsAsync<BusinessRuleException>(() => database.CreateInvoiceService().CreateAsync(
-            database.RepairRequest.Id, new InvoiceCreateDto(), database.Receptionist.Id, UserRole.Receptionist));
+            database.RepairRequest.Id, database.Receptionist.Id, UserRole.Receptionist));
     }
 
     [Fact]
@@ -55,28 +57,38 @@ public sealed class CompleteServiceTests
         await using var database = await TestDatabase.CreateAsync();
         await database.SetRepairRequestStatusAsync(RepairRequestStatus.Completed);
         var service = database.CreateInvoiceService();
-        await service.CreateAsync(database.RepairRequest.Id, new InvoiceCreateDto(), database.Receptionist.Id, UserRole.Receptionist);
+        await service.CreateAsync(database.RepairRequest.Id, database.Receptionist.Id, UserRole.Receptionist);
 
         await Assert.ThrowsAsync<ConflictException>(() => service.CreateAsync(
-            database.RepairRequest.Id, new InvoiceCreateDto(), database.Receptionist.Id, UserRole.Receptionist));
+            database.RepairRequest.Id, database.Receptionist.Id, UserRole.Receptionist));
     }
 
-    [Fact]
-    public async Task CreateInvoice_WarrantyCoveredInvoiceIsPaidImmediately()
+    [Theory]
+    [InlineData(true, 0, 25)]
+    [InlineData(true, 40, 65)]
+    [InlineData(false, 0, 0)]
+    public async Task CreateInvoice_CalculatesFromPersistedChargeabilityAndLabor(
+        bool isChargeable,
+        decimal laborCost,
+        decimal expectedTotal)
     {
         await using var database = await TestDatabase.CreateAsync();
+        database.RepairRequest.IsChargeable = isChargeable;
+        database.RepairRequest.LaborCost = laborCost;
+        await database.Context.SaveChangesAsync();
         await database.SetRepairRequestStatusAsync(RepairRequestStatus.Completed);
 
         var invoice = await database.CreateInvoiceService().CreateAsync(
             database.RepairRequest.Id,
-            new InvoiceCreateDto(IsWarrantyCovered: true),
             database.Receptionist.Id,
             UserRole.Receptionist);
 
-        Assert.Equal(0m, invoice.TotalAmount);
-        Assert.Equal(InvoiceStatus.Paid, invoice.Status);
-        Assert.NotNull(invoice.PaidAt);
-        Assert.Equal(0m, invoice.BalanceDue);
+        Assert.Equal(25m, invoice.PartsTotal);
+        Assert.Equal(laborCost, invoice.LaborTotal);
+        Assert.Equal(expectedTotal, invoice.TotalAmount);
+        Assert.Equal(expectedTotal == 0m ? InvoiceStatus.Paid : InvoiceStatus.Unpaid, invoice.Status);
+        Assert.Equal(expectedTotal == 0m, invoice.PaidAt.HasValue);
+        Assert.Equal(expectedTotal, invoice.BalanceDue);
     }
 
     [Fact]
@@ -89,6 +101,24 @@ public sealed class CompleteServiceTests
             invoice.Id, new PaymentCreateDto(40m, PaymentMethod.Cash, null),
             database.Receptionist.Id, UserRole.Receptionist);
 
+        Assert.Equal(InvoiceStatus.Unpaid, (await database.GetInvoiceAsync(invoice.Id)).Status);
+    }
+
+    [Fact]
+    public async Task CreatePayment_RejectsAmountAboveOutstandingBalance()
+    {
+        await using var database = await TestDatabase.CreateAsync();
+        var invoice = await database.AddInvoiceAsync(100m);
+        var service = database.CreatePaymentService();
+        await service.CreateAsync(
+            invoice.Id, new PaymentCreateDto(40m, PaymentMethod.Cash, null),
+            database.Receptionist.Id, UserRole.Receptionist);
+
+        await Assert.ThrowsAsync<BusinessRuleException>(() => service.CreateAsync(
+            invoice.Id, new PaymentCreateDto(61m, PaymentMethod.Cash, null),
+            database.Receptionist.Id, UserRole.Receptionist));
+
+        Assert.Single(await database.Context.Payments.AsNoTracking().ToListAsync());
         Assert.Equal(InvoiceStatus.Unpaid, (await database.GetInvoiceAsync(invoice.Id)).Status);
     }
 

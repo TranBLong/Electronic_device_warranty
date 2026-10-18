@@ -2,7 +2,7 @@ using Warranty.Enums;
 
 namespace Warranty.Dtos;
 
-public sealed record InvoiceCreateDto(bool IsWarrantyCovered = false);
+public sealed record InvoiceCreateDto;
 
 public sealed record InvoiceLineResponseDto(
     int RepairRequestPartId,

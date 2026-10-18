@@ -1,6 +1,7 @@
 using Warranty.Dtos;
 using Warranty.Enums;
 using Warranty.Exceptions;
+using Warranty.Repositories.Interfaces.Complete;
 using Warranty.Repositories.Interfaces.Important;
 using Warranty.Repositories.Interfaces.Worth;
 using Warranty.Services.Interfaces.Worth;
@@ -10,7 +11,8 @@ namespace Warranty.Services.Implementations.Worth;
 public sealed class RepairRequestPartService(
     IRepairRequestPartRepository repairRequestPartRepository,
     IRepairRequestRepository repairRequestRepository,
-    IPartRepository partRepository) : IRepairRequestPartService
+    IPartRepository partRepository,
+    IInvoiceRepository invoiceRepository) : IRepairRequestPartService
 {
     public async Task<IReadOnlyList<RepairRequestPartResponseDto>> GetByRepairRequestIdAsync(
         int repairRequestId,
@@ -54,6 +56,11 @@ public sealed class RepairRequestPartService(
         if (repairRequest.Status != RepairRequestStatus.InProgress)
         {
             throw new BusinessRuleException("Parts can be added only while the repair request is InProgress.");
+        }
+
+        if (await invoiceRepository.ExistsForRepairRequestAsync(repairRequestId, cancellationToken))
+        {
+            throw new ConflictException("Parts cannot be added after an invoice has been issued.");
         }
 
         var part = await partRepository.GetByIdAsync(request.PartId, cancellationToken: cancellationToken)

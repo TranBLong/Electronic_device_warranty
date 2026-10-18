@@ -16,7 +16,6 @@ public sealed class InvoiceService(
 {
     public async Task<InvoiceResponseDto> CreateAsync(
         int repairRequestId,
-        InvoiceCreateDto request,
         int userId,
         UserRole role,
         CancellationToken cancellationToken = default)
@@ -40,14 +39,15 @@ public sealed class InvoiceService(
 
         var parts = await repairRequestPartRepository.GetByRepairRequestIdAsync(repairRequestId, cancellationToken);
         var partsTotal = parts.Sum(item => item.Quantity * item.UnitPrice);
-        var totalAmount = request.IsWarrantyCovered ? 0m : partsTotal;
+        var laborTotal = repairRequest.LaborCost;
+        var totalAmount = repairRequest.IsChargeable ? partsTotal + laborTotal : 0m;
         var now = DateTime.UtcNow;
         var invoice = new Invoice
         {
             RepairRequestId = repairRequestId,
             InvoiceNumber = $"INV-{Guid.NewGuid():N}",
             PartsTotal = partsTotal,
-            LaborTotal = 0m,
+            LaborTotal = laborTotal,
             TotalAmount = totalAmount,
             IssuedById = userId,
             IssuedAt = now,

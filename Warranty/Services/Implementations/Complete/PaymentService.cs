@@ -58,9 +58,15 @@ public sealed class PaymentService(
             throw new ConflictException("Payments cannot be recorded for a Paid or Cancelled invoice.");
         }
 
+        var totalPaid = await paymentRepository.GetTotalByInvoiceIdAsync(invoiceId, cancellationToken);
+        if (request.Amount > invoice.TotalAmount - totalPaid)
+        {
+            throw new BusinessRuleException("Payment amount cannot exceed the outstanding balance.");
+        }
+
         await paymentRepository.AddAsync(payment, cancellationToken);
         await paymentRepository.SaveChangesAsync(cancellationToken);
-        var totalPaid = await paymentRepository.GetTotalByInvoiceIdAsync(invoiceId, cancellationToken);
+        totalPaid += request.Amount;
         if (totalPaid >= invoice.TotalAmount)
         {
             invoice.Status = InvoiceStatus.Paid;

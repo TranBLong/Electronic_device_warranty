@@ -5,6 +5,7 @@ using Warranty.Dtos;
 using Warranty.Enums;
 using Warranty.Exceptions;
 using Warranty.Models;
+using Warranty.Repositories.Implementations.Complete;
 using Warranty.Repositories.Implementations.Important;
 using Warranty.Repositories.Implementations.Worth;
 using Warranty.Services.Implementations.Worth;
@@ -102,6 +103,29 @@ public sealed class WorthServiceTests
     }
 
     [Fact]
+    public async Task AddPart_RejectsRepairRequestWithInvoice()
+    {
+        await using var database = await TestDatabase.CreateAsync();
+        database.Context.Invoices.Add(new Invoice
+        {
+            RepairRequestId = database.RepairRequest.Id,
+            InvoiceNumber = $"TEST-{Guid.NewGuid():N}",
+            TotalAmount = 10m,
+            IssuedById = database.Receptionist.Id
+        });
+        await database.Context.SaveChangesAsync();
+
+        await Assert.ThrowsAsync<ConflictException>(() => database.CreateRepairRequestPartService().AddAsync(
+            database.RepairRequest.Id,
+            new RepairRequestPartCreateDto(database.Part.Id, 1),
+            database.Technician.Id,
+            UserRole.Technician));
+
+        Assert.Equal(5, await database.GetStockAsync());
+        Assert.Empty(await database.Context.RepairRequestParts.AsNoTracking().ToListAsync());
+    }
+
+    [Fact]
     public async Task DeleteCategory_RejectsCategoryThatHasParts()
     {
         await using var database = await TestDatabase.CreateAsync();
@@ -177,6 +201,7 @@ public sealed class WorthServiceTests
         public Category Category { get; private set; } = null!;
         public Part Part { get; private set; } = null!;
         public User Technician { get; private set; } = null!;
+        public User Receptionist { get; private set; } = null!;
         public RepairRequest RepairRequest { get; private set; } = null!;
 
         public static async Task<TestDatabase> CreateAsync()
@@ -202,7 +227,8 @@ public sealed class WorthServiceTests
             new(
                 new RepairRequestPartRepository(Context),
                 new RepairRequestRepository(Context),
-                new PartRepository(Context));
+                new PartRepository(Context),
+                new InvoiceRepository(Context));
 
         public Task<int> GetStockAsync() =>
             Context.Parts.AsNoTracking()
@@ -219,6 +245,13 @@ public sealed class WorthServiceTests
         private async Task SeedAsync()
         {
             Category = new Category { Name = "Device Parts" };
+            Receptionist = new User
+            {
+                FullName = "Receptionist",
+                Email = "receptionist@example.com",
+                PasswordHash = "test-hash",
+                Role = UserRole.Receptionist
+            };
             Technician = new User
             {
                 FullName = "Assigned Technician",
@@ -265,6 +298,7 @@ public sealed class WorthServiceTests
                 Status = RepairRequestStatus.InProgress
             };
 
+            Context.Users.Add(Receptionist);
             Context.Parts.Add(Part);
             Context.RepairRequests.Add(RepairRequest);
             await Context.SaveChangesAsync();

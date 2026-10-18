@@ -24,7 +24,7 @@ public sealed class InvoicesController(IInvoiceService invoiceService) : Control
             return Unauthorized();
         }
 
-        var invoice = await invoiceService.CreateAsync(repairRequestId, request, userId, role, cancellationToken);
+        var invoice = await invoiceService.CreateAsync(repairRequestId, userId, role, cancellationToken);
         return CreatedAtAction(nameof(GetById), new { id = invoice.Id }, invoice);
     }
 
