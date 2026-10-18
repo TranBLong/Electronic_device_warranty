@@ -68,13 +68,17 @@ public sealed class WarrantyCardService(
             CustomerId = customer.Id,
             StartDate = startDate,
             EndDate = startDate.AddMonths(product.WarrantyMonths),
-            Status = WarrantyStatus.Active,
-            Product = product,
-            Customer = customer
+            Status = WarrantyStatus.Active
         };
         await warrantyCardRepository.AddAsync(card, cancellationToken);
         await warrantyCardRepository.SaveChangesAsync(cancellationToken);
-        return ToResponse(card);
+
+        // The create operation intentionally only sets foreign-key values, so the
+        // navigation properties are not populated on the newly-added entity.
+        // Reload the saved card with its details before mapping the response.
+        var savedCard = await warrantyCardRepository.GetByIdAsync(card.Id, cancellationToken)
+            ?? throw new NotFoundException("The created warranty card could not be loaded.");
+        return ToResponse(savedCard);
     }
 
     private static void EnsureCanView(WarrantyCard card, int userId, UserRole role)
