@@ -32,7 +32,13 @@ public interface IRepairRequestService
     Task<RepairRequestResponse> ChangeStatusAsync(
         int id,
         RepairRequestStatus status,
-        int technicianId,
+        int actorId,
+        UserRole role,
+        CancellationToken cancellationToken = default);
+    Task<RepairRequestResponse> SetChargeabilityAsync(
+        int id,
+        RepairRequestChargeabilityDto request,
+        int actorId,
         UserRole role,
         CancellationToken cancellationToken = default);
 }

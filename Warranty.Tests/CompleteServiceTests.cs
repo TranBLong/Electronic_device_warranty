@@ -202,6 +202,73 @@ public sealed class CompleteServiceTests
     }
 
     [Fact]
+    public async Task ChangeRepairStatus_RejectsTransitionsOutsideApprovedGraph()
+    {
+        await using var database = await TestDatabase.CreateAsync();
+        await database.SetRepairRequestStatusAsync(RepairRequestStatus.Received);
+
+        await Assert.ThrowsAsync<BusinessRuleException>(() => database.CreateRepairRequestService().ChangeStatusAsync(
+            database.RepairRequest.Id, RepairRequestStatus.Completed,
+            database.Technician.Id, UserRole.Technician));
+
+        Assert.Equal(RepairRequestStatus.Received,
+            (await database.Context.RepairRequests.AsNoTracking().SingleAsync()).Status);
+    }
+
+    [Fact]
+    public async Task ChangeRepairStatus_ReceptionistCanReturnCompletedRequest()
+    {
+        await using var database = await TestDatabase.CreateAsync();
+        await database.SetRepairRequestStatusAsync(RepairRequestStatus.Completed);
+
+        var updated = await database.CreateRepairRequestService().ChangeStatusAsync(
+            database.RepairRequest.Id, RepairRequestStatus.Returned,
+            database.Receptionist.Id, UserRole.Receptionist);
+
+        Assert.Equal(RepairRequestStatus.Returned, updated.Status);
+        var history = await database.Context.RepairRequestStatusHistories.AsNoTracking().SingleAsync();
+        Assert.Equal(database.Receptionist.Id, history.ChangedBy);
+    }
+
+    [Fact]
+    public async Task SetChargeability_ValidatesRoleStateAndLaborCost()
+    {
+        await using var database = await TestDatabase.CreateAsync();
+        var service = database.CreateRepairRequestService();
+
+        await Assert.ThrowsAsync<BusinessRuleException>(() => service.SetChargeabilityAsync(
+            database.RepairRequest.Id, new RepairRequestChargeabilityDto(false, 5m),
+            database.Technician.Id, UserRole.Technician));
+
+        var response = await service.SetChargeabilityAsync(
+            database.RepairRequest.Id, new RepairRequestChargeabilityDto(true, 50m),
+            database.Technician.Id, UserRole.Technician);
+
+        Assert.True(response.IsChargeable);
+        Assert.Equal(50m, response.LaborCost);
+        var persisted = await database.Context.RepairRequests.AsNoTracking().SingleAsync();
+        Assert.True(persisted.IsChargeable);
+        Assert.Equal(50m, persisted.LaborCost);
+    }
+
+    [Fact]
+    public async Task SetChargeability_RejectsUnassignedTechnicianAndExistingInvoice()
+    {
+        await using var database = await TestDatabase.CreateAsync();
+        var service = database.CreateRepairRequestService();
+
+        await Assert.ThrowsAsync<ForbiddenException>(() => service.SetChargeabilityAsync(
+            database.RepairRequest.Id, new RepairRequestChargeabilityDto(true, 10m),
+            database.OtherCustomer.Id, UserRole.Technician));
+
+        await database.SetRepairRequestStatusAsync(RepairRequestStatus.Completed);
+        await database.AddInvoiceAsync(10m);
+        await Assert.ThrowsAsync<ConflictException>(() => service.SetChargeabilityAsync(
+            database.RepairRequest.Id, new RepairRequestChargeabilityDto(true, 10m),
+            database.Manager.Id, UserRole.Manager));
+    }
+
+    [Fact]
     public async Task MarkNotificationRead_RejectsOtherUser()
     {
         await using var database = await TestDatabase.CreateAsync();
@@ -346,7 +413,8 @@ public sealed class CompleteServiceTests
             new RepairRequestRepository(Context),
             new WarrantyCardRepository(Context),
             new UserRepository(Context),
-            new ServiceCenterRepository(Context));
+            new ServiceCenterRepository(Context),
+            new InvoiceRepository(Context));
 
         public ServiceCenterService CreateServiceCenterService() =>
             new(new ServiceCenterRepository(Context), new UserRepository(Context));

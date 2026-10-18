@@ -27,6 +27,10 @@ public sealed class ChangeRepairStatusRequest
     public RepairRequestStatus Status { get; init; }
 }
 
+public sealed record RepairRequestChargeabilityDto(
+    bool IsChargeable,
+    [Range(typeof(decimal), "0", "79228162514264337593543950335")] decimal LaborCost);
+
 public sealed record RepairStatusHistoryResponse(
     int Id,
     RepairRequestStatus? OldStatus,
@@ -47,6 +51,8 @@ public sealed record RepairRequestResponse(
     DateTime CreatedAt,
     DateTime UpdatedAt,
     int? ServiceCenterId,
+    bool IsChargeable,
+    decimal LaborCost,
     IReadOnlyList<RepairStatusHistoryResponse> StatusHistory);
 
 public sealed record DashboardSummaryResponse(

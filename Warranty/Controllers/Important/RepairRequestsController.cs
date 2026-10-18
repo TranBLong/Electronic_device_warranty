@@ -65,20 +65,35 @@ public sealed class RepairRequestsController(IRepairRequestService repairRequest
             id, request.TechnicianId, role, cancellationToken));
     }
 
-    [Authorize(Roles = nameof(UserRole.Technician))]
+    [Authorize(Roles = "Technician,Receptionist")]
     [HttpPut("{id:int}/status")]
     public async Task<ActionResult<RepairRequestResponse>> ChangeStatus(
         int id,
         ChangeRepairStatusRequest request,
         CancellationToken cancellationToken)
     {
-        if (!TryGetIdentity(out var technicianId, out var role))
+        if (!TryGetIdentity(out var actorId, out var role))
         {
             return Unauthorized();
         }
 
         return Ok(await repairRequestService.ChangeStatusAsync(
-            id, request.Status, technicianId, role, cancellationToken));
+            id, request.Status, actorId, role, cancellationToken));
+    }
+
+    [Authorize(Roles = "Technician,Manager")]
+    [HttpPut("{id:int}/chargeability")]
+    public async Task<ActionResult<RepairRequestResponse>> SetChargeability(
+        int id,
+        RepairRequestChargeabilityDto request,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetIdentity(out var actorId, out var role))
+        {
+            return Unauthorized();
+        }
+
+        return Ok(await repairRequestService.SetChargeabilityAsync(id, request, actorId, role, cancellationToken));
     }
 
     [Authorize(Roles = "Receptionist,Manager,Admin")]

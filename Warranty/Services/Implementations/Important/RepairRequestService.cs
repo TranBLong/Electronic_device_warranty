@@ -12,7 +12,8 @@ public sealed class RepairRequestService(
     IRepairRequestRepository repairRequestRepository,
     IWarrantyCardRepository warrantyCardRepository,
     IUserRepository userRepository,
-    IServiceCenterRepository serviceCenterRepository) : IRepairRequestService
+    IServiceCenterRepository serviceCenterRepository,
+    IInvoiceRepository invoiceRepository) : IRepairRequestService
 {
     public async Task<IReadOnlyList<RepairRequestResponse>> GetAllAsync(
         int userId,
@@ -148,13 +149,13 @@ public sealed class RepairRequestService(
     public async Task<RepairRequestResponse> ChangeStatusAsync(
         int id,
         RepairRequestStatus status,
-        int technicianId,
+        int actorId,
         UserRole role,
         CancellationToken cancellationToken = default)
     {
-        if (role != UserRole.Technician)
+        if (role is not (UserRole.Technician or UserRole.Receptionist))
         {
-            throw new ForbiddenException("Only Technicians can update repair request status.");
+            throw new ForbiddenException("Only assigned Technicians or Receptionists can update repair request status.");
         }
 
         if (!Enum.IsDefined(status))
@@ -163,24 +164,27 @@ public sealed class RepairRequestService(
         }
 
         var request = await GetRequestAsync(id, cancellationToken, tracking: true);
-        if (request.TechnicianId != technicianId)
+        if (role == UserRole.Technician && request.TechnicianId != actorId)
         {
             throw new ForbiddenException("Only the assigned Technician can update this repair request.");
         }
 
-        if (request.Status == status)
+        var allowedTransition = (request.Status, status) switch
         {
-            throw new BusinessRuleException("The repair request already has this status.");
+            (RepairRequestStatus.Received, RepairRequestStatus.InProgress or RepairRequestStatus.Cancelled) => true,
+            (RepairRequestStatus.InProgress, RepairRequestStatus.Completed or RepairRequestStatus.Cancelled) => true,
+            (RepairRequestStatus.Completed, RepairRequestStatus.Returned) => true,
+            _ => false
+        };
+        if (!allowedTransition)
+        {
+            throw new BusinessRuleException("The repair request status transition is not allowed.");
         }
 
-        if (status == RepairRequestStatus.Returned && request.Status != RepairRequestStatus.Completed)
+        if (role == UserRole.Receptionist &&
+            (request.Status != RepairRequestStatus.Completed || status != RepairRequestStatus.Returned))
         {
-            throw new BusinessRuleException("A repair request can be returned only after completion.");
-        }
-
-        if (request.Status is RepairRequestStatus.Returned or RepairRequestStatus.Cancelled)
-        {
-            throw new BusinessRuleException("A terminal repair request cannot change status.");
+            throw new ForbiddenException("Receptionists can only return a Completed repair request.");
         }
 
         var oldStatus = request.Status;
@@ -190,7 +194,7 @@ public sealed class RepairRequestService(
         {
             OldStatus = oldStatus,
             NewStatus = status,
-            ChangedBy = technicianId
+            ChangedBy = actorId
         });
         await repairRequestRepository.SaveStatusChangeAsync(
             request,
@@ -204,6 +208,46 @@ public sealed class RepairRequestService(
             },
             cancellationToken);
         return ToResponse(request);
+    }
+
+    public async Task<RepairRequestResponse> SetChargeabilityAsync(
+        int id,
+        RepairRequestChargeabilityDto request,
+        int actorId,
+        UserRole role,
+        CancellationToken cancellationToken = default)
+    {
+        if (role is not (UserRole.Technician or UserRole.Manager))
+        {
+            throw new ForbiddenException("Only the assigned Technician or a Manager can set repair charges.");
+        }
+
+        if (request.LaborCost < 0 || (!request.IsChargeable && request.LaborCost != 0))
+        {
+            throw new BusinessRuleException("Labor cost must be non-negative and zero when the repair is not chargeable.");
+        }
+
+        var repairRequest = await GetRequestAsync(id, cancellationToken, tracking: true);
+        if (role == UserRole.Technician && repairRequest.TechnicianId != actorId)
+        {
+            throw new ForbiddenException("Only the assigned Technician can set charges for this repair request.");
+        }
+
+        if (repairRequest.Status is not (RepairRequestStatus.InProgress or RepairRequestStatus.Completed))
+        {
+            throw new BusinessRuleException("Charges can be set only while the repair request is InProgress or Completed.");
+        }
+
+        if (await invoiceRepository.ExistsForRepairRequestAsync(id, cancellationToken))
+        {
+            throw new ConflictException("Charges cannot be changed after an invoice has been issued.");
+        }
+
+        repairRequest.IsChargeable = request.IsChargeable;
+        repairRequest.LaborCost = request.LaborCost;
+        repairRequest.UpdatedAt = DateTime.UtcNow;
+        await repairRequestRepository.SaveChangesAsync(cancellationToken);
+        return ToResponse(repairRequest);
     }
 
     private async Task<RepairRequest> GetRequestAsync(
@@ -246,6 +290,8 @@ public sealed class RepairRequestService(
         request.CreatedAt,
         request.UpdatedAt,
         request.ServiceCenterId,
+        request.IsChargeable,
+        request.LaborCost,
         request.StatusHistory
             .OrderBy(history => history.ChangedAt)
             .Select(history => new RepairStatusHistoryResponse(

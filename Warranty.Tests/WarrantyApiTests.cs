@@ -372,7 +372,8 @@ public sealed class WarrantyApiTests
             new RepairRequestRepository(dbContext),
             new WarrantyCardRepository(dbContext),
             new UserRepository(dbContext),
-            new ServiceCenterRepository(dbContext)));
+            new ServiceCenterRepository(dbContext),
+            new InvoiceRepository(dbContext)));
 
     private static WarrantyCardsController CreateWarrantyCardsController(AppDbContext dbContext) =>
         new(new WarrantyCardService(
