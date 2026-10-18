@@ -159,12 +159,17 @@ public class AppDbContext : DbContext
             entity.Property(invoice => invoice.LaborTotal).HasPrecision(18, 2);
             entity.Property(invoice => invoice.TotalAmount).HasPrecision(18, 2);
             entity.Property(invoice => invoice.Status).HasConversion<string>().HasMaxLength(30);
+            entity.Property(invoice => invoice.CancellationReason).HasMaxLength(500);
             entity.HasIndex(invoice => invoice.InvoiceNumber).IsUnique();
-            entity.HasIndex(invoice => invoice.RepairRequestId).IsUnique(); // 1 phiếu sửa - 1 hóa đơn
-            entity.HasOne(invoice => invoice.RepairRequest).WithOne(request => request.Invoice)
-                .HasForeignKey<Invoice>(invoice => invoice.RepairRequestId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(invoice => invoice.RepairRequestId)
+                .IsUnique()
+                .HasFilter("[Status] <> 'Cancelled'");
+            entity.HasOne(invoice => invoice.RepairRequest).WithMany(request => request.Invoices)
+                .HasForeignKey(invoice => invoice.RepairRequestId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(invoice => invoice.IssuedBy).WithMany(user => user.IssuedInvoices)
                 .HasForeignKey(invoice => invoice.IssuedById).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(invoice => invoice.CancelledBy).WithMany()
+                .HasForeignKey(invoice => invoice.CancelledById).OnDelete(DeleteBehavior.Restrict);
             entity.ToTable(table => table.HasCheckConstraint("CK_Invoices_TotalAmount", "[TotalAmount] >= 0"));
         });
 

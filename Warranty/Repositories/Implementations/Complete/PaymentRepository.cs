@@ -30,6 +30,11 @@ public sealed class PaymentRepository(AppDbContext dbContext) : IPaymentReposito
     public async Task AddAsync(Payment payment, CancellationToken cancellationToken = default) =>
         await dbContext.Payments.AddAsync(payment, cancellationToken);
 
+    public async Task AddNotificationAsync(
+        Notification notification,
+        CancellationToken cancellationToken = default) =>
+        await dbContext.Notifications.AddAsync(notification, cancellationToken);
+
     public async Task SaveChangesAsync(CancellationToken cancellationToken = default) =>
         await dbContext.SaveChangesAsync(cancellationToken);
 

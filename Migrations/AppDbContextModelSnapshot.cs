@@ -98,6 +98,16 @@ namespace Warranty.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("CancellationReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime?>("CancelledAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CancelledById")
+                        .HasColumnType("int");
+
                     b.Property<string>("InvoiceNumber")
                         .IsRequired()
                         .HasMaxLength(50)
@@ -134,13 +144,16 @@ namespace Warranty.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("CancelledById");
+
                     b.HasIndex("InvoiceNumber")
                         .IsUnique();
 
                     b.HasIndex("IssuedById");
 
                     b.HasIndex("RepairRequestId")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("[Status] <> 'Cancelled'");
 
                     b.ToTable("Invoices", t =>
                         {
@@ -693,6 +706,11 @@ namespace Warranty.Migrations
 
             modelBuilder.Entity("Warranty.Models.Invoice", b =>
                 {
+                    b.HasOne("Warranty.Models.User", "CancelledBy")
+                        .WithMany()
+                        .HasForeignKey("CancelledById")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("Warranty.Models.User", "IssuedBy")
                         .WithMany("IssuedInvoices")
                         .HasForeignKey("IssuedById")
@@ -700,10 +718,12 @@ namespace Warranty.Migrations
                         .IsRequired();
 
                     b.HasOne("Warranty.Models.RepairRequest", "RepairRequest")
-                        .WithOne("Invoice")
-                        .HasForeignKey("Warranty.Models.Invoice", "RepairRequestId")
+                        .WithMany("Invoices")
+                        .HasForeignKey("RepairRequestId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.Navigation("CancelledBy");
 
                     b.Navigation("IssuedBy");
 
@@ -936,7 +956,7 @@ namespace Warranty.Migrations
 
                     b.Navigation("Feedback");
 
-                    b.Navigation("Invoice");
+                    b.Navigation("Invoices");
 
                     b.Navigation("Notifications");
 

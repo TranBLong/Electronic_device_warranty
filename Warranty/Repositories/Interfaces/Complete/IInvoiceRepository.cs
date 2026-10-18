@@ -13,4 +13,5 @@ public interface IInvoiceRepository
     Task<bool> ExistsForRepairRequestAsync(int repairRequestId, CancellationToken cancellationToken = default);
     Task AddAsync(Invoice invoice, CancellationToken cancellationToken = default);
     Task SaveChangesAsync(CancellationToken cancellationToken = default);
+    Task SaveChangesWithNotificationAsync(Notification notification, CancellationToken cancellationToken = default);
 }

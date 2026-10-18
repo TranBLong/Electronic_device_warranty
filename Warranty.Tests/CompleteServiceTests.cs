@@ -40,6 +40,9 @@ public sealed class CompleteServiceTests
         Assert.Single(invoice.Lines);
         Assert.Equal(25m, invoice.Lines[0].LineTotal);
         Assert.Equal(InvoiceStatus.Unpaid, invoice.Status);
+        var notification = await database.Context.Notifications.AsNoTracking().SingleAsync();
+        Assert.Equal(NotificationType.InvoiceIssued, notification.Type);
+        Assert.Equal(database.Customer.Id, notification.UserId);
     }
 
     [Fact]
@@ -102,6 +105,7 @@ public sealed class CompleteServiceTests
             database.Receptionist.Id, UserRole.Receptionist);
 
         Assert.Equal(InvoiceStatus.Unpaid, (await database.GetInvoiceAsync(invoice.Id)).Status);
+        Assert.Empty(await database.Context.Notifications.AsNoTracking().ToListAsync());
     }
 
     [Fact]
@@ -135,6 +139,56 @@ public sealed class CompleteServiceTests
         var savedInvoice = await database.GetInvoiceAsync(invoice.Id);
         Assert.Equal(InvoiceStatus.Paid, savedInvoice.Status);
         Assert.NotNull(savedInvoice.PaidAt);
+        var notification = await database.Context.Notifications.AsNoTracking().SingleAsync();
+        Assert.Equal(NotificationType.PaymentCompleted, notification.Type);
+        Assert.Equal(database.Customer.Id, notification.UserId);
+    }
+
+    [Fact]
+    public async Task CancelInvoice_StoresActorAndAllowsReplacementInvoice()
+    {
+        await using var database = await TestDatabase.CreateAsync();
+        database.RepairRequest.IsChargeable = true;
+        await database.Context.SaveChangesAsync();
+        await database.SetRepairRequestStatusAsync(RepairRequestStatus.Completed);
+        var invoiceService = database.CreateInvoiceService();
+        var cancelledInvoice = await invoiceService.CreateAsync(
+            database.RepairRequest.Id, database.Receptionist.Id, UserRole.Receptionist);
+
+        await invoiceService.CancelAsync(
+            cancelledInvoice.Id, database.Manager.Id, UserRole.Manager, "Duplicate issue");
+
+        var cancelled = await database.GetInvoiceAsync(cancelledInvoice.Id);
+        Assert.Equal(InvoiceStatus.Cancelled, cancelled.Status);
+        Assert.NotNull(cancelled.CancelledAt);
+        Assert.Equal(database.Manager.Id, cancelled.CancelledById);
+        Assert.Equal("Duplicate issue", cancelled.CancellationReason);
+        var cancelNotification = await database.Context.Notifications.AsNoTracking()
+            .SingleAsync(item => item.Type == NotificationType.InvoiceCancelled);
+        Assert.Equal(database.Customer.Id, cancelNotification.UserId);
+
+        var replacement = await invoiceService.CreateAsync(
+            database.RepairRequest.Id, database.Receptionist.Id, UserRole.Receptionist);
+        Assert.NotEqual(cancelledInvoice.Id, replacement.Id);
+        Assert.Equal(replacement.Id, (await new InvoiceRepository(database.Context)
+            .GetByRepairRequestIdAsync(database.RepairRequest.Id))?.Id);
+        Assert.Equal(3, await database.Context.Notifications.CountAsync());
+    }
+
+    [Fact]
+    public async Task CancelInvoice_AllowsNoCancellationReason()
+    {
+        await using var database = await TestDatabase.CreateAsync();
+        database.RepairRequest.IsChargeable = true;
+        await database.Context.SaveChangesAsync();
+        await database.SetRepairRequestStatusAsync(RepairRequestStatus.Completed);
+        var invoice = await database.CreateInvoiceService().CreateAsync(
+            database.RepairRequest.Id, database.Receptionist.Id, UserRole.Receptionist);
+
+        await database.CreateInvoiceService().CancelAsync(
+            invoice.Id, database.Receptionist.Id, UserRole.Receptionist, null);
+
+        Assert.Null((await database.GetInvoiceAsync(invoice.Id)).CancellationReason);
     }
 
     [Theory]

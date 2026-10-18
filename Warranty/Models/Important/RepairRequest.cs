@@ -20,7 +20,7 @@ public class RepairRequest
     public ServiceCenter? ServiceCenter { get; set; }
     public User? Receptionist { get; set; }
     public User? Technician { get; set; }
-    public Invoice? Invoice { get; set; }
+    public ICollection<Invoice> Invoices { get; set; } = new List<Invoice>();
     public Feedback? Feedback { get; set; }
     public ICollection<RepairRequestStatusHistory> StatusHistory { get; set; } = new List<RepairRequestStatusHistory>();
     public ICollection<RepairRequestPart> Parts { get; set; } = new List<RepairRequestPart>();

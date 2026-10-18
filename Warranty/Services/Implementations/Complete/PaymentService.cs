@@ -67,10 +67,20 @@ public sealed class PaymentService(
         await paymentRepository.AddAsync(payment, cancellationToken);
         await paymentRepository.SaveChangesAsync(cancellationToken);
         totalPaid += request.Amount;
-        if (totalPaid >= invoice.TotalAmount)
+        if (totalPaid == invoice.TotalAmount)
         {
             invoice.Status = InvoiceStatus.Paid;
             invoice.PaidAt = DateTime.UtcNow;
+            await paymentRepository.AddNotificationAsync(
+                new Notification
+                {
+                    UserId = invoice.RepairRequest.WarrantyCard.CustomerId,
+                    RepairRequestId = invoice.RepairRequestId,
+                    Type = NotificationType.PaymentCompleted,
+                    Title = $"Invoice paid for repair request #{invoice.RepairRequestId}",
+                    Message = $"Invoice {invoice.InvoiceNumber} has been paid in full."
+                },
+                cancellationToken);
         }
 
         await invoiceRepository.SaveChangesAsync(cancellationToken);

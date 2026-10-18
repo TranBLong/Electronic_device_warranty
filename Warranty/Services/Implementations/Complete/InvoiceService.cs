@@ -58,7 +58,16 @@ public sealed class InvoiceService(
         await invoiceRepository.AddAsync(invoice, cancellationToken);
         try
         {
-            await invoiceRepository.SaveChangesAsync(cancellationToken);
+            await invoiceRepository.SaveChangesWithNotificationAsync(
+                new Notification
+                {
+                    UserId = repairRequest.WarrantyCard.CustomerId,
+                    RepairRequestId = repairRequest.Id,
+                    Type = NotificationType.InvoiceIssued,
+                    Title = $"Invoice issued for repair request #{repairRequest.Id}",
+                    Message = $"Invoice {invoice.InvoiceNumber} has been issued."
+                },
+                cancellationToken);
         }
         catch (Microsoft.EntityFrameworkCore.DbUpdateException)
         {
@@ -125,11 +134,22 @@ public sealed class InvoiceService(
         return new PagedResponseDto<InvoiceListResponseDto>(invoices.Select(ToListResponse).ToList(), page, pageSize, count);
     }
 
-    public async Task CancelAsync(int id, UserRole role, CancellationToken cancellationToken = default)
+    public async Task CancelAsync(
+        int id,
+        int actorUserId,
+        UserRole role,
+        string? cancellationReason,
+        CancellationToken cancellationToken = default)
     {
         if (role is not (UserRole.Receptionist or UserRole.Manager))
         {
             throw new ForbiddenException("Only Receptionists and Managers can cancel invoices.");
+        }
+
+        var reason = cancellationReason?.Trim();
+        if (reason?.Length > 500)
+        {
+            throw new BusinessRuleException("Cancellation reason must not exceed 500 characters.");
         }
 
         var invoice = await invoiceRepository.GetByIdAsync(id, tracking: true, cancellationToken)
@@ -140,7 +160,19 @@ public sealed class InvoiceService(
         }
 
         invoice.Status = InvoiceStatus.Cancelled;
-        await invoiceRepository.SaveChangesAsync(cancellationToken);
+        invoice.CancelledAt = DateTime.UtcNow;
+        invoice.CancelledById = actorUserId;
+        invoice.CancellationReason = string.IsNullOrWhiteSpace(reason) ? null : reason;
+        await invoiceRepository.SaveChangesWithNotificationAsync(
+            new Notification
+            {
+                UserId = invoice.RepairRequest.WarrantyCard.CustomerId,
+                RepairRequestId = invoice.RepairRequestId,
+                Type = NotificationType.InvoiceCancelled,
+                Title = $"Invoice cancelled for repair request #{invoice.RepairRequestId}",
+                Message = $"Invoice {invoice.InvoiceNumber} was cancelled."
+            },
+            cancellationToken);
     }
 
     private async Task<Invoice> GetInvoiceAsync(int id, CancellationToken cancellationToken) =>
@@ -187,6 +219,9 @@ public sealed class InvoiceService(
             invoice.IssuedById,
             invoice.IssuedBy.FullName,
             invoice.PaidAt,
+            invoice.CancelledAt,
+            invoice.CancelledById,
+            invoice.CancellationReason,
             invoice.RepairRequest.Parts
                 .OrderBy(item => item.Id)
                 .Select(item => new InvoiceLineResponseDto(

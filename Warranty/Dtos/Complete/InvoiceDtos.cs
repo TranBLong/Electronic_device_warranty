@@ -1,8 +1,11 @@
 using Warranty.Enums;
+using System.ComponentModel.DataAnnotations;
 
 namespace Warranty.Dtos;
 
 public sealed record InvoiceCreateDto;
+
+public sealed record InvoiceCancelDto([StringLength(500)] string? CancellationReason = null);
 
 public sealed record InvoiceLineResponseDto(
     int RepairRequestPartId,
@@ -27,6 +30,9 @@ public sealed record InvoiceResponseDto(
     int IssuedById,
     string IssuedByName,
     DateTime? PaidAt,
+    DateTime? CancelledAt,
+    int? CancelledById,
+    string? CancellationReason,
     IReadOnlyList<InvoiceLineResponseDto> Lines);
 
 public sealed record InvoiceListResponseDto(

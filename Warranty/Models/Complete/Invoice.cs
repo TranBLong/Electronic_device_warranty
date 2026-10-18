@@ -14,8 +14,12 @@ public class Invoice
     public InvoiceStatus Status { get; set; } = InvoiceStatus.Unpaid;
     public DateTime IssuedAt { get; set; } = DateTime.UtcNow;
     public DateTime? PaidAt { get; set; }
+    public DateTime? CancelledAt { get; set; }
+    public int? CancelledById { get; set; }
+    public string? CancellationReason { get; set; }
 
     public RepairRequest RepairRequest { get; set; } = null!;
     public User IssuedBy { get; set; } = null!;
+    public User? CancelledBy { get; set; }
     public ICollection<Payment> Payments { get; set; } = new List<Payment>();
 }

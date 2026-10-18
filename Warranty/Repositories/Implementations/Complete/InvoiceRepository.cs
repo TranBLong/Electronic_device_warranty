@@ -26,7 +26,9 @@ public sealed class InvoiceRepository(AppDbContext dbContext) : IInvoiceReposito
         int repairRequestId,
         CancellationToken cancellationToken = default) =>
         WithDetails(dbContext.Invoices.AsNoTracking())
-            .SingleOrDefaultAsync(invoice => invoice.RepairRequestId == repairRequestId, cancellationToken);
+            .SingleOrDefaultAsync(
+                invoice => invoice.RepairRequestId == repairRequestId && invoice.Status != InvoiceStatus.Cancelled,
+                cancellationToken);
 
     public async Task<IReadOnlyList<Invoice>> GetAllAsync(
         InvoiceStatus? status,
@@ -80,13 +82,25 @@ public sealed class InvoiceRepository(AppDbContext dbContext) : IInvoiceReposito
     }
 
     public Task<bool> ExistsForRepairRequestAsync(int repairRequestId, CancellationToken cancellationToken = default) =>
-        dbContext.Invoices.AsNoTracking().AnyAsync(invoice => invoice.RepairRequestId == repairRequestId, cancellationToken);
+        dbContext.Invoices.AsNoTracking().AnyAsync(
+            invoice => invoice.RepairRequestId == repairRequestId && invoice.Status != InvoiceStatus.Cancelled,
+            cancellationToken);
 
     public async Task AddAsync(Invoice invoice, CancellationToken cancellationToken = default) =>
         await dbContext.Invoices.AddAsync(invoice, cancellationToken);
 
     public async Task SaveChangesAsync(CancellationToken cancellationToken = default) =>
         await dbContext.SaveChangesAsync(cancellationToken);
+
+    public async Task SaveChangesWithNotificationAsync(
+        Notification notification,
+        CancellationToken cancellationToken = default)
+    {
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        dbContext.Notifications.Add(notification);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+    }
 
     private static IQueryable<Invoice> WithDetails(IQueryable<Invoice> query) =>
         query.Include(invoice => invoice.IssuedBy)

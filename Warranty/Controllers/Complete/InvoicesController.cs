@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Warranty.Dtos;
 using Warranty.Enums;
 using Warranty.Services;
@@ -80,14 +81,17 @@ public sealed class InvoicesController(IInvoiceService invoiceService) : Control
 
     [Authorize(Roles = "Receptionist,Manager")]
     [HttpPatch("invoices/{id:int}/cancel")]
-    public async Task<IActionResult> Cancel(int id, CancellationToken cancellationToken)
+    public async Task<IActionResult> Cancel(
+        int id,
+        [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] InvoiceCancelDto? request,
+        CancellationToken cancellationToken)
     {
-        if (!User.TryGetUserRole(out var role))
+        if (!TryGetIdentity(out var userId, out var role))
         {
             return Unauthorized();
         }
 
-        await invoiceService.CancelAsync(id, role, cancellationToken);
+        await invoiceService.CancelAsync(id, userId, role, request?.CancellationReason, cancellationToken);
         return NoContent();
     }
 
