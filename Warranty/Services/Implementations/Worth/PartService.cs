@@ -85,6 +85,11 @@ public sealed class PartService(IPartRepository partRepository, ICategoryReposit
         part.Description = values.Description;
         part.UnitPrice = values.UnitPrice;
         part.StockQuantity = values.StockQuantity;
+        if (request.IsActive.HasValue)
+        {
+            part.IsActive = request.IsActive.Value;
+        }
+
         try
         {
             await partRepository.SaveChangesAsync(cancellationToken);

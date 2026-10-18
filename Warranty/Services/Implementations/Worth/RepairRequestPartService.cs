@@ -65,6 +65,11 @@ public sealed class RepairRequestPartService(
 
         var part = await partRepository.GetByIdAsync(request.PartId, cancellationToken: cancellationToken)
             ?? throw new NotFoundException("Part was not found.");
+        if (!part.IsActive)
+        {
+            throw new BusinessRuleException("Inactive parts cannot be added to repair requests.");
+        }
+
         if (request.Quantity > part.StockQuantity)
         {
             throw new BusinessRuleException("The requested quantity exceeds the available stock.");

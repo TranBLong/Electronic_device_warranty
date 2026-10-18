@@ -14,7 +14,8 @@ public sealed record PartUpdateDto(
     string PartNumber,
     string? Description,
     decimal UnitPrice,
-    int StockQuantity);
+    int StockQuantity,
+    bool? IsActive = null);
 
 public sealed record PartStockUpdateDto(int StockQuantity);
 

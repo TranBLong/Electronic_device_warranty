@@ -56,6 +56,7 @@ Ghi chú:
 ### Product
 - Id (PK), Name, Brand, Model, SerialNumber (unique), WarrantyMonths, CreatedAt
 - *(Tầng Worth bổ sung)* CategoryId (FK → Category, nullable; API Product hỗ trợ đọc/ghi)
+- `ProductRequest.CategoryId` là tùy chọn; `null` nghĩa là chưa phân loại, giá trị khác null phải tham chiếu Category tồn tại. `ProductResponse` luôn trả CategoryId hiện tại.
 
 ### WarrantyCard
 - Id (PK), ProductId (FK → Product), CustomerId (FK → User, Role=Customer)
@@ -136,6 +137,7 @@ Mọi chuyển trạng thái không có trong bảng đều bị từ chối. Ma
 - Chỉ thêm linh kiện khi `RepairRequest.Status = InProgress` và `TechnicianId` là chính Technician đang thao tác.
 - `UnitPrice` sao chép từ `Part.UnitPrice` lúc thêm, đổi giá sau này không ảnh hưởng dữ liệu cũ.
 - Không được thêm Part đã ngừng hoạt động (`IsActive=false`) vào RepairRequest.
+- `PartUpdateDto.IsActive` là tùy chọn để tương thích client cũ; khi được gửi, Manager/Admin có thể bật hoặc ngừng hoạt động Part.
 - Không được thêm RepairRequestPart nếu RepairRequest đã có invoice.
 - Không xóa `Category` đang có `Part`; không xóa `Part` đã được dùng trong `RepairRequestPart`.
 
@@ -148,7 +150,7 @@ Mọi chuyển trạng thái không có trong bảng đều bị từ chối. Ma
 
 Lưu ý riêng của tầng:
 - Thêm `RepairRequestPart` và trừ `Part.StockQuantity` phải trong **cùng 1 transaction**.
-- Cần migration thêm `Product.CategoryId` (nullable).
+- `Product.CategoryId` đã được thêm nullable bởi migration `AddCategoryAndParts`; GĐ4 chỉ hoàn thiện DTO, validation và service cho field này, không cần migration mới.
 
 ---
 

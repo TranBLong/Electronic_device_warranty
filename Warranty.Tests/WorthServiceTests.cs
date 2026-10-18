@@ -8,6 +8,7 @@ using Warranty.Models;
 using Warranty.Repositories.Implementations.Complete;
 using Warranty.Repositories.Implementations.Important;
 using Warranty.Repositories.Implementations.Worth;
+using Warranty.Services.Implementations.Important;
 using Warranty.Services.Implementations.Worth;
 
 namespace Warranty.Tests;
@@ -65,6 +66,24 @@ public sealed class WorthServiceTests
             UserRole.Technician));
         Assert.Empty(await database.Context.RepairRequestParts.ToListAsync());
         Assert.Equal(5, await database.GetStockAsync());
+    }
+
+    [Fact]
+    public async Task AddPart_RejectsInactivePart()
+    {
+        await using var database = await TestDatabase.CreateAsync();
+        database.Part.IsActive = false;
+        await database.Context.SaveChangesAsync();
+
+        await Assert.ThrowsAsync<BusinessRuleException>(() =>
+            database.CreateRepairRequestPartService().AddAsync(
+                database.RepairRequest.Id,
+                new RepairRequestPartCreateDto(database.Part.Id, 1),
+                database.Technician.Id,
+                UserRole.Technician));
+
+        Assert.Equal(5, await database.GetStockAsync());
+        Assert.Empty(await database.Context.RepairRequestParts.AsNoTracking().ToListAsync());
     }
 
     [Fact]
@@ -187,6 +206,71 @@ public sealed class WorthServiceTests
         Assert.Equal(3, updated.StockQuantity);
     }
 
+    [Fact]
+    public async Task UpdatePart_CanSetIsActiveAndPreservesItWhenOmitted()
+    {
+        await using var database = await TestDatabase.CreateAsync();
+        var service = database.CreatePartService();
+
+        var deactivated = await service.UpdateAsync(database.Part.Id, new PartUpdateDto(
+            database.Category.Id, "Replacement Part", "PART-001", null, 12.50m, 5, false));
+        var unchanged = await service.UpdateAsync(database.Part.Id, new PartUpdateDto(
+            database.Category.Id, "Replacement Part", "PART-001", null, 12.50m, 5));
+
+        Assert.False(deactivated.IsActive);
+        Assert.False(unchanged.IsActive);
+    }
+
+    [Fact]
+    public async Task ProductCategory_IsOptionalAndReturnedOnCreateAndUpdate()
+    {
+        await using var database = await TestDatabase.CreateAsync();
+        var service = database.CreateProductService();
+        var product = await service.CreateAsync(new ProductRequest
+        {
+            Name = "New Product",
+            Brand = "Example",
+            Model = "Model B",
+            SerialNumber = "PRODUCT-NEW",
+            WarrantyMonths = 24
+        });
+
+        Assert.Null(product.CategoryId);
+
+        var updated = await service.UpdateAsync(product.Id, new ProductRequest
+        {
+            CategoryId = database.Category.Id,
+            Name = "New Product",
+            Brand = "Example",
+            Model = "Model B",
+            SerialNumber = "PRODUCT-NEW",
+            WarrantyMonths = 24
+        });
+
+        Assert.Equal(database.Category.Id, updated.CategoryId);
+        Assert.Equal(database.Category.Id, await database.Context.Products.AsNoTracking()
+            .Where(item => item.Id == product.Id)
+            .Select(item => item.CategoryId)
+            .SingleAsync());
+    }
+
+    [Fact]
+    public async Task ProductCategory_RejectsUnknownCategory()
+    {
+        await using var database = await TestDatabase.CreateAsync();
+
+        await Assert.ThrowsAsync<NotFoundException>(() =>
+            database.CreateProductService().CreateAsync(new ProductRequest
+            {
+                CategoryId = int.MaxValue,
+                Name = "New Product",
+                Brand = "Example",
+                Model = "Model B",
+                SerialNumber = "PRODUCT-NEW",
+                WarrantyMonths = 24
+            }));
+    }
+
     private sealed class TestDatabase : IAsyncDisposable
     {
         private readonly SqliteConnection _connection;
@@ -200,6 +284,7 @@ public sealed class WorthServiceTests
         public AppDbContext Context { get; }
         public Category Category { get; private set; } = null!;
         public Part Part { get; private set; } = null!;
+        public Product Product { get; private set; } = null!;
         public User Technician { get; private set; } = null!;
         public User Receptionist { get; private set; } = null!;
         public RepairRequest RepairRequest { get; private set; } = null!;
@@ -222,6 +307,9 @@ public sealed class WorthServiceTests
 
         public PartService CreatePartService() =>
             new(new PartRepository(Context), new CategoryRepository(Context));
+
+        public ProductService CreateProductService() =>
+            new(new ProductRepository(Context), new CategoryRepository(Context));
 
         public RepairRequestPartService CreateRepairRequestPartService() =>
             new(
@@ -266,7 +354,7 @@ public sealed class WorthServiceTests
                 PasswordHash = "test-hash",
                 Role = UserRole.Customer
             };
-            var product = new Product
+            Product = new Product
             {
                 Name = "Test Product",
                 Brand = "Example",
@@ -276,7 +364,7 @@ public sealed class WorthServiceTests
             };
             var card = new WarrantyCard
             {
-                Product = product,
+                Product = Product,
                 Customer = customer,
                 StartDate = DateTime.UtcNow.Date,
                 EndDate = DateTime.UtcNow.Date.AddMonths(12),

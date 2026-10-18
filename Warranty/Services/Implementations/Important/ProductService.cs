@@ -4,11 +4,14 @@ using Warranty.Dtos;
 using Warranty.Exceptions;
 using Warranty.Models;
 using Warranty.Repositories.Interfaces.Important;
+using Warranty.Repositories.Interfaces.Worth;
 using Warranty.Services.Interfaces.Important;
 
 namespace Warranty.Services.Implementations.Important;
 
-public sealed class ProductService(IProductRepository productRepository) : IProductService
+public sealed class ProductService(
+    IProductRepository productRepository,
+    ICategoryRepository categoryRepository) : IProductService
 {
     public async Task<IReadOnlyList<ProductResponse>> GetAllAsync(CancellationToken cancellationToken = default) =>
         (await productRepository.GetAllAsync(cancellationToken)).Select(ToResponse).ToList();
@@ -21,6 +24,7 @@ public sealed class ProductService(IProductRepository productRepository) : IProd
         CancellationToken cancellationToken = default)
     {
         var serialNumber = NormalizeSerialNumber(request.SerialNumber);
+        var category = await GetCategoryAsync(request.CategoryId, cancellationToken);
         if (await productRepository.SerialNumberExistsAsync(serialNumber, cancellationToken: cancellationToken))
         {
             throw new ConflictException("Serial number is already registered.");
@@ -28,6 +32,7 @@ public sealed class ProductService(IProductRepository productRepository) : IProd
 
         var product = new Product
         {
+            CategoryId = category?.Id,
             Name = request.Name.Trim(),
             Brand = request.Brand.Trim(),
             Model = request.Model.Trim(),
@@ -46,12 +51,14 @@ public sealed class ProductService(IProductRepository productRepository) : IProd
     {
         var product = await GetProductAsync(id, cancellationToken, tracking: true);
         var serialNumber = NormalizeSerialNumber(request.SerialNumber);
+        var category = await GetCategoryAsync(request.CategoryId, cancellationToken);
         if (await productRepository.SerialNumberExistsAsync(serialNumber, id, cancellationToken))
         {
             throw new ConflictException("Serial number is already registered.");
         }
 
         product.Name = request.Name.Trim();
+        product.CategoryId = category?.Id;
         product.Brand = request.Brand.Trim();
         product.Model = request.Model.Trim();
         product.SerialNumber = serialNumber;
@@ -79,6 +86,17 @@ public sealed class ProductService(IProductRepository productRepository) : IProd
         await productRepository.GetByIdAsync(id, tracking, cancellationToken)
         ?? throw new NotFoundException("Product was not found.");
 
+    private async Task<Category?> GetCategoryAsync(int? categoryId, CancellationToken cancellationToken)
+    {
+        if (!categoryId.HasValue)
+        {
+            return null;
+        }
+
+        return await categoryRepository.GetByIdAsync(categoryId.Value, cancellationToken: cancellationToken)
+            ?? throw new NotFoundException("Category was not found.");
+    }
+
     private async Task SaveProductAsync(CancellationToken cancellationToken)
     {
         try
@@ -97,5 +115,6 @@ public sealed class ProductService(IProductRepository productRepository) : IProd
         exception.InnerException is SqlException { Number: 2601 or 2627 };
 
     private static ProductResponse ToResponse(Product product) => new(
-        product.Id, product.Name, product.Brand, product.Model, product.SerialNumber, product.WarrantyMonths, product.CreatedAt);
+        product.Id, product.CategoryId, product.Name, product.Brand, product.Model, product.SerialNumber,
+        product.WarrantyMonths, product.CreatedAt);
 }

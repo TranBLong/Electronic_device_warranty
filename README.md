@@ -35,13 +35,23 @@ All routes other than registration, login, and refresh require a valid bearer ac
 | GET/POST/PUT/DELETE | `/api/users`, `/api/users/{id}` | Admin; DELETE deactivates, never hard-deletes |
 | GET | `/api/users/customers` | Admin or Receptionist; active Customer accounts |
 | GET | `/api/users/technicians` | Admin, Manager, or Receptionist; active Technician accounts |
-| GET/POST/PUT/DELETE | `/api/products`, `/api/products/{id}` | Authenticated read; Admin write |
+| GET | `/api/products`, `/api/products/{id}` | Any authenticated user |
+| POST/PUT/DELETE | `/api/products`, `/api/products/{id}` | Admin |
 | GET/POST | `/api/warranty-cards` | Customer sees own cards; Admin/Receptionist see all; Receptionist creates |
 | GET/POST | `/api/repair-requests` | Customer/Technician scoped to own records; Admin/Manager/Receptionist see all; Customer or Receptionist creates |
 | PUT | `/api/repair-requests/{id}/technician` | Receptionist or Manager |
-| PUT | `/api/repair-requests/{id}/status` | Assigned Technician |
+| PUT | `/api/repair-requests/{id}/status` | Assigned Technician for valid transitions; Receptionist only for `Completed` → `Returned` |
+| PUT | `/api/repair-requests/{id}/chargeability` | Assigned Technician or Manager |
 | PATCH | `/api/repair-requests/{id}/service-center` | Receptionist, Manager, or Admin |
-| GET/POST/PUT/PATCH/DELETE | `/api/service-centers`, `/api/service-centers/{id}` | Authenticated read; Manager/Admin write |
+| GET/POST/PUT/DELETE | `/api/categories`, `/api/categories/{id}` | Any authenticated user reads; Manager/Admin write |
+| GET | `/api/parts`, `/api/parts/{id}` | Admin, Manager, Receptionist, or Technician |
+| POST/PUT/PATCH/DELETE | `/api/parts`, `/api/parts/{id}`, `/api/parts/{id}/stock` | Manager or Admin |
+| GET | `/api/repair-requests/{repairRequestId}/parts` | Admin/Manager/Receptionist; assigned Technician; owning Customer |
+| POST | `/api/repair-requests/{repairRequestId}/parts` | Assigned Technician while repair is `InProgress` |
+| GET | `/api/service-centers`, `/api/service-centers/{id}` | Any authenticated user |
+| POST | `/api/service-centers` | Manager or Admin |
+| PUT/DELETE | `/api/service-centers/{id}` | Manager or Admin |
+| PATCH | `/api/service-centers/{id}/active` | Manager or Admin |
 | POST | `/api/repair-requests/{repairRequestId}/invoice` | Receptionist; Completed/Returned repair requests |
 | GET | `/api/invoices`, `/api/invoices/{id}`, `/api/repair-requests/{repairRequestId}/invoice` | Admin/Manager/Receptionist; Customer sees own invoices |
 | GET | `/api/invoices/my` | Customer |
@@ -57,7 +67,11 @@ All routes other than registration, login, and refresh require a valid bearer ac
 
 Customer registration cannot choose a role. Profile updates accept only FullName, Email, and Phone. Account deactivation sets `IsActive = false`, revokes refresh tokens, blocks future authenticated requests, and preserves referenced records.
 
-Repair requests created by a Customer have a null `ReceptionistId`; receptionist-created requests store the authenticated Receptionist. Warranty eligibility is checked using both persisted status and end date. Every request creation records its initial `Received` state, and every subsequent status change adds a history row and a Customer notification in the same transaction. Attachments are stored outside `wwwroot`; `Upload:MaxFileSizeBytes`, `Upload:AllowedExtensions`, and `Upload:RootPath` configure upload validation and storage. The optional SQL sample-center seed is [`scripts/seed-service-centers.sql`](./scripts/seed-service-centers.sql).
+`Product.CategoryId` is optional; when supplied on create/update it must identify an existing category and is returned by Product reads. The Part update request can optionally change `IsActive`; inactive parts cannot be added to a repair request. Part usage is rejected once an invoice exists for that repair request.
+
+Repair requests created by a Customer have a null `ReceptionistId`; receptionist-created requests store the authenticated Receptionist. Warranty eligibility is checked using both persisted status and end date. Every request creation records its initial `Received` state, and every subsequent status change adds a history row and a Customer notification in the same transaction. The allowed transitions are `Received` → `InProgress` or `Cancelled`, `InProgress` → `Completed` or `Cancelled`, and `Completed` → `Returned`; only the assigned Technician can perform the first two transitions, while the assigned Technician or Receptionist can return a completed device. Chargeability can be changed only by the assigned Technician or a Manager while the request is `InProgress` or `Completed` and has no invoice.
+
+Invoice cancellation accepts an optional JSON body such as `{"cancellationReason":"Duplicate issue"}`; the body and reason may both be omitted. Cancellation records the actor and time. A cancelled invoice no longer prevents issuing a replacement invoice for the repair request. Customers receive notifications when an invoice is issued, an invoice is cancelled, or an invoice is paid in full. Attachments are stored outside `wwwroot`; `Upload:MaxFileSizeBytes`, `Upload:AllowedExtensions`, and `Upload:RootPath` configure upload validation and storage. The optional SQL sample-center seed is [`scripts/seed-service-centers.sql`](./scripts/seed-service-centers.sql).
 
 ## Scope
 

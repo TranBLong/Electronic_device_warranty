@@ -4,6 +4,9 @@ namespace Warranty.Dtos;
 
 public sealed class ProductRequest
 {
+    [Range(1, int.MaxValue)]
+    public int? CategoryId { get; init; }
+
     [Required, StringLength(200)]
     public string Name { get; init; } = string.Empty;
 
@@ -22,6 +25,7 @@ public sealed class ProductRequest
 
 public sealed record ProductResponse(
     int Id,
+    int? CategoryId,
     string Name,
     string Brand,
     string Model,
