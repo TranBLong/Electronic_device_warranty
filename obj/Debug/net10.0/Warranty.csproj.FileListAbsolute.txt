@@ -250,3 +250,5 @@ C:\Users\ASUS\AppData\Local\Temp\WarrantyG4Tests\Warranty.deps.json
 C:\Users\ASUS\AppData\Local\Temp\WarrantyG4Tests\Warranty.runtimeconfig.json
 C:\Users\ASUS\AppData\Local\Temp\WarrantyG4Tests\Warranty.dll
 C:\Users\ASUS\AppData\Local\Temp\WarrantyG4Tests\Warranty.pdb
+D:\FileBaiTap\Ky7\3tc\Web2\Code\Warranty\bin\Debug\net10.0\System.Security.Cryptography.Pkcs.dll
+D:\FileBaiTap\Ky7\3tc\Web2\Code\Warranty\bin\Debug\net10.0\runtimes\win\lib\net10.0\System.Security.Cryptography.Pkcs.dll
