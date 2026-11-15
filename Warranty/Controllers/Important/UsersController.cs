@@ -36,6 +36,18 @@ public sealed class UsersController(IUserService userService) : ControllerBase
         return Ok(await userService.UpdateMeAsync(userId, request, cancellationToken));
     }
 
+    [HttpPut("me/password")]
+    public async Task<IActionResult> ChangePassword(ChangePasswordRequest request, CancellationToken cancellationToken)
+    {
+        if (!User.TryGetUserId(out var userId))
+        {
+            return Unauthorized();
+        }
+
+        await userService.ChangePasswordAsync(userId, request, cancellationToken);
+        return NoContent();
+    }
+
     [HttpDelete("me")]
     public async Task<IActionResult> DeactivateMe(CancellationToken cancellationToken)
     {

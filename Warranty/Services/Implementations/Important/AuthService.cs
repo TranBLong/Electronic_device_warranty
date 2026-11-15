@@ -120,6 +120,23 @@ public sealed class AuthService(
         return response;
     }
 
+    public async Task LogoutAsync(
+        int userId,
+        LogoutRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var tokenHash = HashRefreshToken(request.RefreshToken);
+        var storedToken = await refreshTokenRepository.GetByHashAsync(tokenHash, cancellationToken);
+        if (storedToken is null || storedToken.IsRevoked || storedToken.UserId != userId)
+        {
+            return;
+        }
+
+        storedToken.IsRevoked = true;
+        await refreshTokenRepository.SaveChangesAsync(cancellationToken);
+        logger?.LogInformation("User {UserId} logged out (refresh token revoked).", userId);
+    }
+
     private AuthResponse CreateTokenResponse(User user)
     {
         var accessToken = tokenService.CreateAccessToken(user);

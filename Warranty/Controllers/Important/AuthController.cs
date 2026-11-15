@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Warranty.Dtos;
+using Warranty.Services;
 using Warranty.Services.Interfaces.Important;
 
 namespace Warranty.Controllers;
@@ -32,4 +33,17 @@ public sealed class AuthController(IAuthService authService) : ControllerBase
         RefreshRequest request,
         CancellationToken cancellationToken) =>
         Ok(await authService.RefreshAsync(request, cancellationToken));
+
+    [Authorize]
+    [HttpPost("logout")]
+    public async Task<IActionResult> Logout(LogoutRequest request, CancellationToken cancellationToken)
+    {
+        if (!User.TryGetUserId(out var userId))
+        {
+            return Unauthorized();
+        }
+
+        await authService.LogoutAsync(userId, request, cancellationToken);
+        return NoContent();
+    }
 }

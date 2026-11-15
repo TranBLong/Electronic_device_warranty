@@ -37,3 +37,9 @@ public sealed record AuthResponse(
     DateTime AccessTokenExpiresAt,
     string RefreshToken,
     DateTime RefreshTokenExpiresAt);
+
+public sealed class LogoutRequest
+{
+    [Required, StringLength(256)]
+    public string RefreshToken { get; init; } = string.Empty;
+}

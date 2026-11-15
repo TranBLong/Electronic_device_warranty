@@ -55,6 +55,15 @@ public sealed class UpdateMyProfileRequest
     public string? Phone { get; init; }
 }
 
+public sealed class ChangePasswordRequest
+{
+    [Required, StringLength(72)]
+    public string CurrentPassword { get; init; } = string.Empty;
+
+    [Required, MinLength(8), StringLength(72)]
+    public string NewPassword { get; init; } = string.Empty;
+}
+
 public sealed record UserResponse(
     int Id,
     string FullName,

@@ -10,6 +10,7 @@ public interface IUserService
         UpdateMyProfileRequest request,
         CancellationToken cancellationToken = default);
     Task DeactivateMeAsync(int userId, CancellationToken cancellationToken = default);
+    Task ChangePasswordAsync(int userId, ChangePasswordRequest request, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<UserResponse>> GetCustomersAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<UserResponse>> GetTechniciansAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<UserResponse>> GetAllAsync(CancellationToken cancellationToken = default);

@@ -38,6 +38,27 @@ public sealed class UserService(
     public async Task DeactivateMeAsync(int userId, CancellationToken cancellationToken = default) =>
         await DeactivateUserAsync(userId, cancellationToken);
 
+    public async Task ChangePasswordAsync(
+        int userId,
+        ChangePasswordRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var user = await GetUserAsync(userId, cancellationToken, tracking: true);
+        if (!PasswordHashing.Verify(request.CurrentPassword, user.PasswordHash))
+        {
+            throw new UnauthorizedException("Current password is incorrect.");
+        }
+
+        if (!PasswordHashing.CanHash(request.NewPassword))
+        {
+            throw new BusinessRuleException("Password must be between 8 and 72 UTF-8 bytes.");
+        }
+
+        user.PasswordHash = PasswordHashing.Hash(request.NewPassword);
+        await refreshTokenRepository.MarkActiveAsRevokedAsync(userId, cancellationToken);
+        await userRepository.SaveChangesAsync(cancellationToken);
+    }
+
     public async Task<IReadOnlyList<UserResponse>> GetCustomersAsync(CancellationToken cancellationToken = default) =>
         ToResponses(await userRepository.GetActiveByRoleAsync(UserRole.Customer, cancellationToken));
 
