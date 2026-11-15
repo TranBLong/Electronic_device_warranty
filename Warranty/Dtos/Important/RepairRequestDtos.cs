@@ -31,6 +31,20 @@ public sealed record RepairRequestChargeabilityDto(
     bool IsChargeable,
     [Range(typeof(decimal), "0", "79228162514264337593543950335")] decimal LaborCost);
 
+public sealed class UpdateRepairRequestDetailsDto
+{
+    [StringLength(1000)]
+    public string? DeviceCondition { get; init; }
+
+    [StringLength(4000)]
+    public string? DiagnosisNote { get; init; }
+
+    [StringLength(4000)]
+    public string? Resolution { get; init; }
+
+    public DateTime? EstimatedCompletionDate { get; init; }
+}
+
 public sealed record RepairStatusHistoryResponse(
     int Id,
     RepairRequestStatus? OldStatus,
@@ -53,6 +67,10 @@ public sealed record RepairRequestResponse(
     int? ServiceCenterId,
     bool IsChargeable,
     decimal LaborCost,
+    string? DeviceCondition,
+    string? DiagnosisNote,
+    string? Resolution,
+    DateTime? EstimatedCompletionDate,
     IReadOnlyList<RepairStatusHistoryResponse> StatusHistory);
 
 public sealed record DashboardSummaryResponse(

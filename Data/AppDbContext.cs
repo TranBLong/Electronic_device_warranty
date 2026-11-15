@@ -71,6 +71,9 @@ public class AppDbContext : DbContext
         {
             entity.HasKey(request => request.Id);
             entity.Property(request => request.Description).HasMaxLength(4000).IsRequired();
+            entity.Property(request => request.DeviceCondition).HasMaxLength(1000);
+            entity.Property(request => request.DiagnosisNote).HasMaxLength(4000);
+            entity.Property(request => request.Resolution).HasMaxLength(4000);
             entity.Property(request => request.Status).HasConversion<string>().HasMaxLength(30);
             entity.Property(request => request.LaborCost).HasPrecision(18, 2);
             entity.HasOne(request => request.WarrantyCard).WithMany(card => card.RepairRequests)

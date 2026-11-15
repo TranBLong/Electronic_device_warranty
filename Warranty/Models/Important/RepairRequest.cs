@@ -15,6 +15,10 @@ public class RepairRequest
     public decimal LaborCost { get; set; }   // tiền công
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+    public string? DeviceCondition { get; set; }
+    public string? DiagnosisNote { get; set; }
+    public string? Resolution { get; set; }
+    public DateTime? EstimatedCompletionDate { get; set; }
 
     public WarrantyCard WarrantyCard { get; set; } = null!;
     public ServiceCenter? ServiceCenter { get; set; }

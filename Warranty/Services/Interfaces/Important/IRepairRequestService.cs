@@ -47,4 +47,10 @@ public interface IRepairRequestService
         int actorId,
         UserRole role,
         CancellationToken cancellationToken = default);
+    Task<RepairRequestResponse> UpdateDetailsAsync(
+        int id,
+        UpdateRepairRequestDetailsDto request,
+        int actorId,
+        UserRole role,
+        CancellationToken cancellationToken = default);
 }

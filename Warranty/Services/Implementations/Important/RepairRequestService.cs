@@ -279,6 +279,59 @@ public sealed class RepairRequestService(
         return ToResponse(repairRequest);
     }
 
+    public async Task<RepairRequestResponse> UpdateDetailsAsync(
+        int id,
+        UpdateRepairRequestDetailsDto request,
+        int actorId,
+        UserRole role,
+        CancellationToken cancellationToken = default)
+    {
+        var repairRequest = await GetRequestAsync(id, cancellationToken, tracking: true);
+
+        if (repairRequest.Status is not (RepairRequestStatus.Received or RepairRequestStatus.InProgress or RepairRequestStatus.Completed))
+        {
+            throw new BusinessRuleException("Details can only be updated when the repair request is Received, InProgress or Completed.");
+        }
+
+        if (role == UserRole.Manager)
+        {
+            // Managers have full access to repair details.
+        }
+        else if (role == UserRole.Technician && repairRequest.TechnicianId == actorId)
+        {
+            // Assigned technicians have full access to repair details.
+        }
+        else if (role == UserRole.Receptionist && repairRequest.Status == RepairRequestStatus.Received)
+        {
+            if (request.DiagnosisNote is not null || request.Resolution is not null || request.EstimatedCompletionDate is not null)
+            {
+                throw new ForbiddenException("Receptionists can only set DeviceCondition while the request is Received.");
+            }
+        }
+        else
+        {
+            throw new ForbiddenException("Only the assigned Technician, a Manager, or a Receptionist (DeviceCondition only) can update details.");
+        }
+
+        if (request.EstimatedCompletionDate is { } estimated && estimated.Date < repairRequest.CreatedAt.Date)
+        {
+            throw new BusinessRuleException("EstimatedCompletionDate cannot be earlier than the creation date.");
+        }
+
+        if (request.DeviceCondition is not null)
+            repairRequest.DeviceCondition = request.DeviceCondition.Trim();
+        if (request.DiagnosisNote is not null)
+            repairRequest.DiagnosisNote = request.DiagnosisNote.Trim();
+        if (request.Resolution is not null)
+            repairRequest.Resolution = request.Resolution.Trim();
+        if (request.EstimatedCompletionDate is not null)
+            repairRequest.EstimatedCompletionDate = request.EstimatedCompletionDate;
+
+        repairRequest.UpdatedAt = DateTime.UtcNow;
+        await repairRequestRepository.SaveChangesAsync(cancellationToken);
+        return ToResponse(repairRequest);
+    }
+
     private async Task<RepairRequest> GetRequestAsync(
         int id,
         CancellationToken cancellationToken,
@@ -321,6 +374,10 @@ public sealed class RepairRequestService(
         request.ServiceCenterId,
         request.IsChargeable,
         request.LaborCost,
+        request.DeviceCondition,
+        request.DiagnosisNote,
+        request.Resolution,
+        request.EstimatedCompletionDate,
         request.StatusHistory
             .OrderBy(history => history.ChangedAt)
             .Select(history => new RepairStatusHistoryResponse(

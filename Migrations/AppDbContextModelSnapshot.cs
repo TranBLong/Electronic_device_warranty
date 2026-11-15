@@ -401,6 +401,17 @@ namespace Warranty.Migrations
                         .HasMaxLength(4000)
                         .HasColumnType("nvarchar(4000)");
 
+                    b.Property<string>("DeviceCondition")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("DiagnosisNote")
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<DateTime?>("EstimatedCompletionDate")
+                        .HasColumnType("datetime2");
+
                     b.Property<bool>("IsChargeable")
                         .HasColumnType("bit");
 
@@ -410,6 +421,10 @@ namespace Warranty.Migrations
 
                     b.Property<int?>("ReceptionistId")
                         .HasColumnType("int");
+
+                    b.Property<string>("Resolution")
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
 
                     b.Property<int?>("ServiceCenterId")
                         .HasColumnType("int");

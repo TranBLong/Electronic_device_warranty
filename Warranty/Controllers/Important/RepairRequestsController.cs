@@ -118,6 +118,21 @@ public sealed class RepairRequestsController(IRepairRequestService repairRequest
             id, request.ServiceCenterId, role, cancellationToken));
     }
 
+    [Authorize(Roles = "Technician,Manager,Receptionist")]
+    [HttpPatch("{id:int}/details")]
+    public async Task<ActionResult<RepairRequestResponse>> UpdateDetails(
+        int id,
+        UpdateRepairRequestDetailsDto request,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetIdentity(out var actorId, out var role))
+        {
+            return Unauthorized();
+        }
+
+        return Ok(await repairRequestService.UpdateDetailsAsync(id, request, actorId, role, cancellationToken));
+    }
+
     private bool TryGetIdentity(out int userId, out UserRole role)
     {
         role = default;
