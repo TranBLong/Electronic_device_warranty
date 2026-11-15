@@ -37,8 +37,32 @@ public sealed class WarrantyCardRepository(AppDbContext dbContext) : IWarrantyCa
             .CountAsync(cancellationToken);
 
     public Task<WarrantyCard?> GetByIdAsync(int id, CancellationToken cancellationToken = default) =>
-        WithDetails(dbContext.WarrantyCards.AsNoTracking())
-            .SingleOrDefaultAsync(card => card.Id == id, cancellationToken);
+        GetByIdAsync(id, tracking: false, cancellationToken);
+
+    public Task<WarrantyCard?> GetByIdAsync(
+        int id, bool tracking, CancellationToken cancellationToken = default)
+    {
+        var query = dbContext.WarrantyCards.AsQueryable();
+        if (!tracking) query = query.AsNoTracking();
+        return WithDetails(query).SingleOrDefaultAsync(card => card.Id == id, cancellationToken);
+    }
+
+    public Task<bool> HasBlockingRepairRequestsAsync(
+        int warrantyCardId, CancellationToken cancellationToken = default) =>
+        dbContext.RepairRequests.AsNoTracking().AnyAsync(request =>
+            request.WarrantyCardId == warrantyCardId &&
+            (request.Status == RepairRequestStatus.Received ||
+             request.Status == RepairRequestStatus.InProgress ||
+             request.Status == RepairRequestStatus.Completed), cancellationToken);
+
+    public async Task VoidAsync(
+        WarrantyCard card, Notification notification, CancellationToken cancellationToken = default)
+    {
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        dbContext.Notifications.Add(notification);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+    }
 
     public Task<int> CountAsync(CancellationToken cancellationToken = default) =>
         dbContext.WarrantyCards.AsNoTracking().CountAsync(cancellationToken);

@@ -22,4 +22,10 @@ public interface IWarrantyCardService
         CreateWarrantyCardRequest request,
         UserRole role,
         CancellationToken cancellationToken = default);
+    Task<WarrantyCardResponse> VoidAsync(
+        int id,
+        VoidWarrantyCardRequest? request,
+        int actorId,
+        UserRole role,
+        CancellationToken cancellationToken = default);
 }

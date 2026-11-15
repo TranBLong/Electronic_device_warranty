@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Warranty.Dtos;
 using Warranty.Enums;
 using Warranty.Services;
@@ -52,6 +53,19 @@ public sealed class WarrantyCardsController(IWarrantyCardService warrantyCardSer
 
         var card = await warrantyCardService.CreateAsync(request, role, cancellationToken);
         return CreatedAtAction(nameof(GetById), new { id = card.Id }, card);
+    }
+
+    [Authorize(Roles = "Receptionist,Admin")]
+    [HttpPatch("{id:int}/void")]
+    public async Task<ActionResult<WarrantyCardResponse>> Void(
+        int id,
+        [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] VoidWarrantyCardRequest? request,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetIdentity(out var actorId, out var role))
+            return Unauthorized();
+
+        return Ok(await warrantyCardService.VoidAsync(id, request, actorId, role, cancellationToken));
     }
 
     private bool TryGetIdentity(out int userId, out UserRole role)

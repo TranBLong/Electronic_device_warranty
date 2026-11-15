@@ -10,6 +10,8 @@ public class WarrantyCard
     public DateTime StartDate { get; set; }
     public DateTime EndDate { get; set; }
     public WarrantyStatus Status { get; set; } = WarrantyStatus.Active;
+    public DateTime? VoidedAt { get; set; }
+    public string? VoidReason { get; set; }
 
     public Product Product { get; set; } = null!;
     public User Customer { get; set; } = null!;

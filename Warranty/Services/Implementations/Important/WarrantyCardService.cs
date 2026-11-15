@@ -95,6 +95,46 @@ public sealed class WarrantyCardService(
         return ToResponse(savedCard);
     }
 
+    public async Task<WarrantyCardResponse> VoidAsync(
+        int id,
+        VoidWarrantyCardRequest? request,
+        int actorId,
+        UserRole role,
+        CancellationToken cancellationToken = default)
+    {
+        if (role is not (UserRole.Receptionist or UserRole.Admin))
+            throw new ForbiddenException("Only Receptionists and Admins can void warranty cards.");
+
+        var card = await warrantyCardRepository.GetByIdAsync(id, tracking: true, cancellationToken)
+            ?? throw new NotFoundException("Warranty card was not found.");
+        if (card.Status == WarrantyStatus.Voided)
+            throw new ConflictException("The warranty card has already been voided.");
+        if (card.Status != WarrantyStatus.Active)
+            throw new BusinessRuleException("Only Active warranty cards can be voided.");
+        if (await warrantyCardRepository.HasBlockingRepairRequestsAsync(id, cancellationToken))
+            throw new BusinessRuleException("Cannot void a warranty card that still has repair requests in Received, InProgress or Completed status.");
+
+        var reason = request?.Reason?.Trim();
+        if (reason?.Length > 500)
+            throw new BusinessRuleException("Void reason must not exceed 500 characters.");
+
+        card.Status = WarrantyStatus.Voided;
+        card.VoidedAt = DateTime.UtcNow;
+        card.VoidReason = string.IsNullOrEmpty(reason) ? null : reason;
+        var notification = new Notification
+        {
+            UserId = card.CustomerId,
+            Type = NotificationType.General,
+            Title = $"Warranty card #{card.Id} has been voided",
+            Message = string.IsNullOrEmpty(reason)
+                ? $"Your warranty card #{card.Id} has been voided."
+                : $"Your warranty card #{card.Id} has been voided. Reason: {reason}"
+        };
+
+        await warrantyCardRepository.VoidAsync(card, notification, cancellationToken);
+        return ToResponse(card);
+    }
+
     private static void EnsureCanView(WarrantyCard card, int userId, UserRole role)
     {
         if (role == UserRole.Customer && card.CustomerId == userId)
@@ -126,5 +166,7 @@ public sealed class WarrantyCardService(
         card.EndDate,
         card.Status == WarrantyStatus.Active && card.EndDate.Date < DateTime.UtcNow.Date
             ? WarrantyStatus.Expired
-            : card.Status);
+            : card.Status,
+        card.VoidedAt,
+        card.VoidReason);
 }

@@ -60,6 +60,7 @@ public class AppDbContext : DbContext
         {
             entity.HasKey(card => card.Id);
             entity.Property(card => card.Status).HasConversion<string>().HasMaxLength(30);
+            entity.Property(card => card.VoidReason).HasMaxLength(500);
             entity.HasOne(card => card.Product).WithMany(product => product.WarrantyCards)
                 .HasForeignKey(card => card.ProductId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(card => card.Customer).WithMany(user => user.WarrantyCards)

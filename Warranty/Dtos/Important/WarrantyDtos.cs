@@ -14,6 +14,12 @@ public sealed class CreateWarrantyCardRequest
     public DateTime StartDate { get; init; }
 }
 
+public sealed class VoidWarrantyCardRequest
+{
+    [StringLength(500)]
+    public string? Reason { get; init; }
+}
+
 public sealed record WarrantyCardResponse(
     int Id,
     int ProductId,
@@ -23,4 +29,6 @@ public sealed record WarrantyCardResponse(
     string CustomerName,
     DateTime StartDate,
     DateTime EndDate,
-    WarrantyStatus Status);
+    WarrantyStatus Status,
+    DateTime? VoidedAt,
+    string? VoidReason);
