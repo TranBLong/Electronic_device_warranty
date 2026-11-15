@@ -390,8 +390,36 @@ public sealed class WarrantyApiTests
     {
         await using var database = await TestDatabase.CreateAsync();
         await DatabaseSeeder.SeedAsync(database.Context);
-        var requests = await database.Context.RepairRequests.Take(3).ToListAsync();
         var issuer = await database.Context.Users.FirstAsync(user => user.Role == UserRole.Receptionist);
+        var card = await database.Context.WarrantyCards.FirstAsync();
+        var technician = await database.Context.Users.FirstAsync(user => user.Role == UserRole.Technician);
+        var requests = new[]
+        {
+            new RepairRequest
+            {
+                WarrantyCardId = card.Id,
+                TechnicianId = technician.Id,
+                Description = "Page filter RR 1",
+                Status = RepairRequestStatus.Completed
+            },
+            new RepairRequest
+            {
+                WarrantyCardId = card.Id,
+                TechnicianId = technician.Id,
+                Description = "Page filter RR 2",
+                Status = RepairRequestStatus.Completed
+            },
+            new RepairRequest
+            {
+                WarrantyCardId = card.Id,
+                TechnicianId = technician.Id,
+                Description = "Page filter RR 3",
+                Status = RepairRequestStatus.Completed
+            }
+        };
+        database.Context.RepairRequests.AddRange(requests);
+        await database.Context.SaveChangesAsync();
+
         var start = DateTime.UtcNow.Date.AddDays(-10);
         database.Context.Invoices.AddRange(
             new Invoice { RepairRequestId = requests[0].Id, InvoiceNumber = "PAGE-INV-1", IssuedById = issuer.Id, IssuedAt = start.AddDays(1), TotalAmount = 10m },
