@@ -389,6 +389,7 @@ public sealed class WarrantyApiTests
     public async Task Invoices_GetAll_FilterIssuedAt_ReturnsTotalPages()
     {
         await using var database = await TestDatabase.CreateAsync();
+        await DatabaseSeeder.SeedAsync(database.Context);
         var requests = await database.Context.RepairRequests.Take(3).ToListAsync();
         var issuer = await database.Context.Users.FirstAsync(user => user.Role == UserRole.Receptionist);
         var start = DateTime.UtcNow.Date.AddDays(-10);
