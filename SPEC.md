@@ -222,3 +222,50 @@ Lưu ý riêng của tầng:
 ## Phạm vi hiện tại
 Ba tầng ở trên (Important → Worth → Complete) nằm trong phạm vi dự án, làm lần lượt theo thứ tự tầng. Trạng thái cụ thể xem bảng "Phân tầng phạm vi".
 Phần sau **chưa làm** trong giai đoạn này: AuditLog.
+
+---
+
+# YÊU CẦU PHI CHỨC NĂNG
+
+## Định dạng lỗi
+Middleware hiện ánh xạ `NotFoundException` → 404, `ForbiddenException` → 403, `BusinessRuleException` → 400, `ConflictException` → 409 và `UnauthorizedException` → 401, với Content-Type `application/problem+json` và body `ProblemDetails` gồm `status`, `title`. Ví dụ định dạng mục tiêu:
+
+```json
+{
+  "status": 500,
+  "title": "An unexpected error occurred.",
+  "traceId": "00-..."
+}
+```
+
+**Yêu cầu mới:** bắt cả lỗi không lường trước, trả 500 thống nhất kèm `traceId`; không trả `ex.Message` hoặc stack trace ở Production. Hiện middleware chưa thực hiện catch-all, chưa có `traceId`; response nghiệp vụ hiện dùng nội dung exception làm `title`.
+
+## Danh sách, phân trang, tìm kiếm và sắp xếp
+Hiện chưa có class query dùng chung, dynamic sort hoặc whitelist sort; PageSize tối đa chưa được xác định trong code. Các endpoint và khả năng hiện có:
+
+| Endpoint danh sách | Hiện trạng query/paging | Sắp xếp hiện tại trong Repository |
+|---|---|---|
+| `GET /api/products` | Không phân trang; không tìm kiếm query | `Name` tăng dần |
+| `GET /api/users` | Không phân trang; không tìm kiếm query | `Id` tăng dần |
+| `GET /api/users/customers`, `/api/users/technicians` | Không phân trang; lọc theo vai trò và tài khoản active | `FullName` tăng dần |
+| `GET /api/warranty-cards` | Không phân trang; Customer được giới hạn dữ liệu của mình | `StartDate` giảm dần |
+| `GET /api/repair-requests` | Không phân trang; phân phạm vi theo Customer/Technician | `CreatedAt` giảm dần |
+| `GET /api/categories` | Lọc query `name`; không phân trang | `Name` tăng dần |
+| `GET /api/parts` | Lọc `categoryId`, `search`; có `page`, `pageSize` | `Name` tăng dần |
+| `GET /api/service-centers` | Lọc `name`, `isActive`; không phân trang | `Name` tăng dần |
+| `GET /api/feedbacks` | Lọc `rating`; có `page`, `pageSize` | `CreatedAt` giảm dần, sau đó `Id` giảm dần |
+| `GET /api/invoices`, `GET /api/invoices/my` | `invoices` lọc `status`; có `page`, `pageSize` | `IssuedAt` giảm dần, sau đó `Id` giảm dần |
+| `GET /api/notifications` | Lọc `unreadOnly`; có `page`, `pageSize`; theo tài khoản hiện tại | `CreatedAt` giảm dần, sau đó `Id` giảm dần |
+
+Các endpoint danh sách còn lại không được xác nhận là hỗ trợ phân trang. `GET /api/repair-requests/{id}/parts`, `GET /api/repair-requests/{id}/attachments`, và các endpoint đọc feedback/invoice theo ID không phải danh sách phân trang. **Yêu cầu mới:** thống nhất danh sách bằng `PagedResponseDto<T>` và query class gồm `PageNumber`, `PageSize`, `Keyword`, `SortBy`, `IsDescending`; whitelist `SortBy` riêng cho từng endpoint và đặt giới hạn PageSize tối đa. Giá trị giới hạn tối đa: **CẦN XÁC NHẬN**.
+
+`PagedResponseDto<T>` hiện có `Items`, `Page`, `PageSize`, `TotalCount`, chưa có `TotalPages`.
+
+## Upload đính kèm
+Theo `RepairRequestAttachmentService` và `appsettings.json`: file không rỗng; tối đa cấu hình `Upload:MaxFileSizeBytes` (hiện là 5.242.880 byte = 5 MiB); extension cho phép cấu hình hiện gồm `.jpg`, `.jpeg`, `.png`, `.pdf`; Content-Type phải khớp extension; chữ ký được kiểm tra theo JPEG (`FF D8 FF`), PNG (8 byte signature) và PDF (`%PDF-`). Tên file gốc tối đa 255 ký tự. File được đổi sang tên GUID, lưu trong `Upload:RootPath` (hiện `App_Data/attachments`, đường dẫn tương đối được tính từ ContentRootPath), ngoài `wwwroot`; DB lưu đường dẫn tương đối và metadata. Service nhận cấu hình bằng `IConfiguration` (`GetValue`/`GetSection`), chưa dùng Options Pattern. Mặc dù service có hằng số mặc định 5 MiB, cấu hình `MaxFileSizeBytes` hiện là bắt buộc và được dùng khi validate.
+
+## Logging, health check và CORS
+- **Logging:** cấu hình mặc định hiện có mức `Information`; `Microsoft.AspNetCore` ở `Warning`. Middleware và Service chưa dùng `ILogger<T>` theo rà soát mã nguồn. Yêu cầu mới: dùng logging có cấu trúc, không ghi mật khẩu/token/dữ liệu nhạy cảm.
+- **Health check:** hiện chưa đăng ký health checks và chưa có endpoint `/health`. Yêu cầu mới: cung cấp `/health`; loại kiểm tra thành phần và mức sẵn sàng cần áp dụng: **CẦN XÁC NHẬN**.
+- **CORS:** hiện chưa đăng ký/chạy CORS và chưa có cấu hình CORS trong `appsettings.json`. Yêu cầu mới: cấu hình chính sách nguồn gốc cho phép bằng appsettings. Danh sách origin: **CẦN XÁC NHẬN**.
+- Dockerfile hiện chưa có.

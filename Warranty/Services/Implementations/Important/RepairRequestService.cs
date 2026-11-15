@@ -13,7 +13,8 @@ public sealed class RepairRequestService(
     IWarrantyCardRepository warrantyCardRepository,
     IUserRepository userRepository,
     IServiceCenterRepository serviceCenterRepository,
-    IInvoiceRepository invoiceRepository) : IRepairRequestService
+    IInvoiceRepository invoiceRepository,
+    ILogger<RepairRequestService>? logger = null) : IRepairRequestService
 {
     public async Task<IReadOnlyList<RepairRequestResponse>> GetAllAsync(
         int userId,
@@ -92,6 +93,7 @@ public sealed class RepairRequestService(
 
         await repairRequestRepository.AddAsync(repairRequest, cancellationToken);
         await repairRequestRepository.SaveChangesAsync(cancellationToken);
+        logger?.LogInformation("Repair request {RepairRequestId} created by user {UserId}.", repairRequest.Id, actorId);
         return ToResponse(await GetRequestAsync(repairRequest.Id, cancellationToken));
     }
 
@@ -118,6 +120,7 @@ public sealed class RepairRequestService(
         request.ServiceCenter = center;
         request.UpdatedAt = DateTime.UtcNow;
         await repairRequestRepository.SaveChangesAsync(cancellationToken);
+        logger?.LogInformation("Service center {ServiceCenterId} assigned to repair request {RepairRequestId}.", center.Id, id);
         return ToResponse(request);
     }
 
@@ -143,6 +146,7 @@ public sealed class RepairRequestService(
         request.Technician = technician;
         request.UpdatedAt = DateTime.UtcNow;
         await repairRequestRepository.SaveChangesAsync(cancellationToken);
+        logger?.LogInformation("Technician {TechnicianId} assigned to repair request {RepairRequestId}.", technician.Id, id);
         return ToResponse(request);
     }
 
@@ -207,6 +211,9 @@ public sealed class RepairRequestService(
                 Message = $"Repair request #{request.Id} status changed to {status}."
             },
             cancellationToken);
+        logger?.LogInformation(
+            "Repair request {RepairRequestId} status changed from {OldStatus} to {NewStatus} by user {UserId}.",
+            id, oldStatus, status, actorId);
         return ToResponse(request);
     }
 
@@ -247,6 +254,7 @@ public sealed class RepairRequestService(
         repairRequest.LaborCost = request.LaborCost;
         repairRequest.UpdatedAt = DateTime.UtcNow;
         await repairRequestRepository.SaveChangesAsync(cancellationToken);
+        logger?.LogInformation("Chargeability updated for repair request {RepairRequestId} by user {UserId}.", id, actorId);
         return ToResponse(repairRequest);
     }
 

@@ -9,7 +9,8 @@ namespace Warranty.Services.Implementations.Complete;
 
 public sealed class PaymentService(
     IPaymentRepository paymentRepository,
-    IInvoiceRepository invoiceRepository) : IPaymentService
+    IInvoiceRepository invoiceRepository,
+    ILogger<PaymentService>? logger = null) : IPaymentService
 {
     public async Task<PaymentResponseDto> CreateAsync(
         int invoiceId,
@@ -88,6 +89,8 @@ public sealed class PaymentService(
 
         var paymentDto = (await paymentRepository.GetByInvoiceIdAsync(invoiceId, cancellationToken))
             .Single(item => item.Id == payment.Id);
+        logger?.LogInformation("Payment {PaymentId} recorded for invoice {InvoiceId} by user {UserId}.",
+            payment.Id, invoiceId, userId);
         return ToResponse(paymentDto);
     }
 

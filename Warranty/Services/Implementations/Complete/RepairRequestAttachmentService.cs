@@ -15,7 +15,8 @@ public sealed class RepairRequestAttachmentService(
     IRepairRequestAttachmentRepository attachmentRepository,
     IRepairRequestRepository repairRequestRepository,
     IConfiguration configuration,
-    IWebHostEnvironment environment) : IRepairRequestAttachmentService
+    IWebHostEnvironment environment,
+    ILogger<RepairRequestAttachmentService>? logger = null) : IRepairRequestAttachmentService
 {
     private const long DefaultUploadLimit = 5 * 1024 * 1024;
 
@@ -73,6 +74,8 @@ public sealed class RepairRequestAttachmentService(
 
         var savedAttachment = await attachmentRepository.GetByIdAsync(attachment.Id, cancellationToken)
             ?? throw new InvalidOperationException("Saved attachment could not be loaded.");
+        logger?.LogInformation("Attachment {AttachmentId} uploaded for repair request {RepairRequestId} by user {UserId}.",
+            attachment.Id, repairRequestId, userId);
         return ToResponse(savedAttachment, savedAttachment.UploadedBy.FullName);
     }
 

@@ -15,7 +15,8 @@ namespace Warranty.Services.Implementations.Important;
 public sealed class AuthService(
     IUserRepository userRepository,
     IRefreshTokenRepository refreshTokenRepository,
-    TokenService tokenService) : IAuthService
+    TokenService tokenService,
+    ILogger<AuthService>? logger = null) : IAuthService
 {
     private static readonly TimeSpan RefreshTokenLifetime = TimeSpan.FromDays(7);
 
@@ -51,6 +52,7 @@ public sealed class AuthService(
             throw new ConflictException("Email is already registered.");
         }
 
+        logger?.LogInformation("Registered customer account {UserId}.", user.Id);
         return ToResponse(user);
     }
 
@@ -72,6 +74,7 @@ public sealed class AuthService(
             ExpiresAt = response.RefreshTokenExpiresAt
         }, cancellationToken);
         await refreshTokenRepository.SaveChangesAsync(cancellationToken);
+        logger?.LogInformation("User {UserId} signed in.", user.Id);
         return response;
     }
 
@@ -108,7 +111,13 @@ public sealed class AuthService(
             return issued;
         }, cancellationToken);
 
-        return response ?? throw new UnauthorizedException("Refresh token is invalid or expired.");
+        if (response is null)
+        {
+            throw new UnauthorizedException("Refresh token is invalid or expired.");
+        }
+
+        logger?.LogInformation("Refresh token rotated.");
+        return response;
     }
 
     private AuthResponse CreateTokenResponse(User user)

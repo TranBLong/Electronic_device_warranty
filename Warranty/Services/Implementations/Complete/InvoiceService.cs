@@ -12,7 +12,8 @@ namespace Warranty.Services.Implementations.Complete;
 public sealed class InvoiceService(
     IInvoiceRepository invoiceRepository,
     IRepairRequestRepository repairRequestRepository,
-    IRepairRequestPartRepository repairRequestPartRepository) : IInvoiceService
+    IRepairRequestPartRepository repairRequestPartRepository,
+    ILogger<InvoiceService>? logger = null) : IInvoiceService
 {
     public async Task<InvoiceResponseDto> CreateAsync(
         int repairRequestId,
@@ -79,6 +80,8 @@ public sealed class InvoiceService(
             throw;
         }
 
+        logger?.LogInformation("Invoice {InvoiceId} issued for repair request {RepairRequestId} by user {UserId}.",
+            invoice.Id, repairRequestId, userId);
         return ToResponse(await GetInvoiceAsync(invoice.Id, cancellationToken));
     }
 
@@ -173,6 +176,7 @@ public sealed class InvoiceService(
                 Message = $"Invoice {invoice.InvoiceNumber} was cancelled."
             },
             cancellationToken);
+        logger?.LogInformation("Invoice {InvoiceId} cancelled by user {UserId}.", id, actorUserId);
     }
 
     private async Task<Invoice> GetInvoiceAsync(int id, CancellationToken cancellationToken) =>

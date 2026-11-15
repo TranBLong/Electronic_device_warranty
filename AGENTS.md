@@ -45,8 +45,11 @@ Warranty/                  (solution)
 - **Làm giống code đã có ở tầng Important** (đặt tên, cách tổ chức Dto, cách trả lỗi) — mở file tương ứng của Important để làm mẫu trước khi tạo file mới.
 - Dùng `async/await` và `CancellationToken` ở các method truy cập DB nếu code hiện tại đã dùng.
 - Truy vấn đọc dùng `AsNoTracking()`; chỉ `Include` khi cần.
-- Không hard-code secret/connection string; lấy từ `appsettings*.json`.
-- Lỗi nghiệp vụ ném exception trong `Exceptions/`, **không** trả `500`; `Middlewares/` chuyển thành 400/403/404/409 với JSON thống nhất.
+- Danh sách trả về dùng `PagedResponseDto<T>` và một lớp `QueryParameters` gồm `PageNumber`, `PageSize`, `Keyword`, `SortBy`, `IsDescending`. `SortBy` phải được kiểm tra bằng whitelist theo endpoint; giới hạn `PageSize` tối đa và xử lý PageNumber không hợp lệ tại Service.
+- Cấu hình dùng Options Pattern (`IOptions<T>`); không đọc `IConfiguration` rải rác trong Service. Không hard-code secret/connection string. Bí mật đặt trong .NET User Secrets hoặc biến môi trường; không commit bí mật.
+- **Logging**: dùng `ILogger<T>`, không dùng `Console.WriteLine`. `Debug` cho chẩn đoán phát triển có kiểm soát; `Information` cho sự kiện vận hành quan trọng; `Warning` cho tình huống bất thường có thể xử lý; `Error` cho lỗi cần điều tra. Không ghi mật khẩu, access/refresh token hoặc dữ liệu nhạy cảm vào log.
+- **Xử lý lỗi**: lỗi nghiệp vụ ném exception trong `Exceptions/`. `ExceptionHandlingMiddleware` ánh xạ sang `ProblemDetails`; lỗi không lường trước trả HTTP 500 với `traceId`. Không đưa `ex.Message`/stack trace ra response ở Production.
+- Thứ tự middleware trong `Program.cs`: `UseHttpsRedirection` (ép HTTPS trước xử lý request); `UseRouting` nếu khai báo tường minh; `UseCors` (sau routing, trước xác thực); `UseAuthentication` (đọc danh tính trước kiểm tra quyền); `ExceptionHandlingMiddleware` (bọc các middleware/endpoint phía sau để chuẩn hóa lỗi); `ActiveUserMiddleware` (kiểm tra tài khoản đã xác thực còn hoạt động); `UseAuthorization` (áp dụng quyền); cuối cùng map endpoint. Giữ thứ tự phù hợp với các middleware thực sự được bật.
 - Không đổi/phá API và schema của tầng đã hoàn thành. Field mới thêm vào entity cũ (`Product.CategoryId`, `RepairRequest.ServiceCenterId`) phải **nullable**.
 - Thay đổi schema → tạo EF migration riêng cho mỗi tầng, đặt tên rõ nghĩa (ví dụ `AddWorthTier`, `AddCompleteTier`).
 

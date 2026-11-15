@@ -3,7 +3,9 @@ using Warranty.Exceptions;
 
 namespace Warranty.Middlewares;
 
-public sealed class ExceptionHandlingMiddleware(RequestDelegate next)
+public sealed class ExceptionHandlingMiddleware(
+    RequestDelegate next,
+    ILogger<ExceptionHandlingMiddleware> logger)
 {
     public async Task InvokeAsync(HttpContext context)
     {
@@ -13,13 +15,24 @@ public sealed class ExceptionHandlingMiddleware(RequestDelegate next)
         }
         catch (Exception exception) when (TryGetStatusCode(exception, out var statusCode))
         {
+            logger.LogWarning(exception, "Business request failure returned {StatusCode}. TraceId: {TraceId}",
+                statusCode, context.TraceIdentifier);
             context.Response.StatusCode = statusCode;
             context.Response.ContentType = "application/problem+json";
-            await context.Response.WriteAsJsonAsync(new ProblemDetails
-            {
-                Status = statusCode,
-                Title = exception.Message
-            }, context.RequestAborted);
+            await context.Response.WriteAsJsonAsync(CreateProblemDetails(
+                statusCode,
+                exception.Message,
+                context.TraceIdentifier), context.RequestAborted);
+        }
+        catch (Exception exception)
+        {
+            logger.LogError(exception, "Unhandled exception. TraceId: {TraceId}", context.TraceIdentifier);
+            context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+            context.Response.ContentType = "application/problem+json";
+            await context.Response.WriteAsJsonAsync(CreateProblemDetails(
+                StatusCodes.Status500InternalServerError,
+                "An unexpected error occurred.",
+                context.TraceIdentifier), context.RequestAborted);
         }
     }
 
@@ -35,5 +48,16 @@ public sealed class ExceptionHandlingMiddleware(RequestDelegate next)
             _ => 0
         };
         return statusCode != 0;
+    }
+
+    private static ProblemDetails CreateProblemDetails(int statusCode, string title, string traceId)
+    {
+        var problem = new ProblemDetails
+        {
+            Status = statusCode,
+            Title = title
+        };
+        problem.Extensions["traceId"] = traceId;
+        return problem;
     }
 }
