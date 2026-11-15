@@ -85,6 +85,44 @@ public sealed class RepairRequestPartService(
         return ToResponse(usage);
     }
 
+    public async Task RemoveAsync(
+        int repairRequestId,
+        int id,
+        int technicianId,
+        UserRole role,
+        CancellationToken cancellationToken = default)
+    {
+        if (role != UserRole.Technician)
+        {
+            throw new ForbiddenException("Only Technicians can remove parts from repair requests.");
+        }
+
+        var repairRequest = await repairRequestRepository.GetByIdAsync(
+            repairRequestId, cancellationToken: cancellationToken)
+            ?? throw new NotFoundException("Repair request was not found.");
+        if (repairRequest.TechnicianId != technicianId)
+        {
+            throw new ForbiddenException("Only the assigned Technician can remove parts from this repair request.");
+        }
+
+        if (repairRequest.Status != RepairRequestStatus.InProgress)
+        {
+            throw new BusinessRuleException("Parts can be removed only while the repair request is InProgress.");
+        }
+
+        if (await invoiceRepository.ExistsForRepairRequestAsync(repairRequestId, cancellationToken))
+        {
+            throw new ConflictException("Parts cannot be removed after an invoice has been issued.");
+        }
+
+        var removed = await repairRequestPartRepository.RemoveWithStockIncrementAsync(
+            repairRequestId, id, cancellationToken);
+        if (!removed)
+        {
+            throw new NotFoundException("Repair request part was not found.");
+        }
+    }
+
     private static void EnsureCanView(Models.RepairRequest repairRequest, int userId, UserRole role)
     {
         if (role is UserRole.Admin or UserRole.Manager or UserRole.Receptionist)

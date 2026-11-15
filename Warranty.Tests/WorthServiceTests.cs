@@ -145,6 +145,83 @@ public sealed class WorthServiceTests
     }
 
     [Fact]
+    public async Task RemovePart_AssignedTechnicianInProgress_RestoresStockAndDeletesUsage()
+    {
+        await using var database = await TestDatabase.CreateAsync();
+        var usage = await database.CreateRepairRequestPartService().AddAsync(
+            database.RepairRequest.Id,
+            new RepairRequestPartCreateDto(database.Part.Id, 2),
+            database.Technician.Id,
+            UserRole.Technician);
+
+        await database.CreateRepairRequestPartService().RemoveAsync(
+            database.RepairRequest.Id,
+            usage.Id,
+            database.Technician.Id,
+            UserRole.Technician);
+
+        Assert.Equal(5, await database.GetStockAsync());
+        Assert.Empty(await database.Context.RepairRequestParts.AsNoTracking().ToListAsync());
+    }
+
+    [Fact]
+    public async Task RemovePart_WrongRepairRequestId_ThrowsNotFoundAndPreservesStock()
+    {
+        await using var database = await TestDatabase.CreateAsync();
+        var usage = await database.CreateRepairRequestPartService().AddAsync(
+            database.RepairRequest.Id,
+            new RepairRequestPartCreateDto(database.Part.Id, 2),
+            database.Technician.Id,
+            UserRole.Technician);
+        var anotherRequest = new RepairRequest
+        {
+            WarrantyCardId = database.RepairRequest.WarrantyCardId,
+            TechnicianId = database.Technician.Id,
+            Description = "Another repair",
+            Status = RepairRequestStatus.InProgress
+        };
+        database.Context.RepairRequests.Add(anotherRequest);
+        await database.Context.SaveChangesAsync();
+
+        await Assert.ThrowsAsync<NotFoundException>(() => database.CreateRepairRequestPartService().RemoveAsync(
+            anotherRequest.Id,
+            usage.Id,
+            database.Technician.Id,
+            UserRole.Technician));
+
+        Assert.Equal(3, await database.GetStockAsync());
+        Assert.Single(await database.Context.RepairRequestParts.AsNoTracking().ToListAsync());
+    }
+
+    [Fact]
+    public async Task RemovePart_WhenInvoiceExists_ThrowsConflictAndPreservesStock()
+    {
+        await using var database = await TestDatabase.CreateAsync();
+        var usage = await database.CreateRepairRequestPartService().AddAsync(
+            database.RepairRequest.Id,
+            new RepairRequestPartCreateDto(database.Part.Id, 2),
+            database.Technician.Id,
+            UserRole.Technician);
+        database.Context.Invoices.Add(new Invoice
+        {
+            RepairRequestId = database.RepairRequest.Id,
+            InvoiceNumber = $"TEST-{Guid.NewGuid():N}",
+            TotalAmount = 25m,
+            IssuedById = database.Receptionist.Id
+        });
+        await database.Context.SaveChangesAsync();
+
+        await Assert.ThrowsAsync<ConflictException>(() => database.CreateRepairRequestPartService().RemoveAsync(
+            database.RepairRequest.Id,
+            usage.Id,
+            database.Technician.Id,
+            UserRole.Technician));
+
+        Assert.Equal(3, await database.GetStockAsync());
+        Assert.Single(await database.Context.RepairRequestParts.AsNoTracking().ToListAsync());
+    }
+
+    [Fact]
     public async Task DeleteCategory_RejectsCategoryThatHasParts()
     {
         await using var database = await TestDatabase.CreateAsync();

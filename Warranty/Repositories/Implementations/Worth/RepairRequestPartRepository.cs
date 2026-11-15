@@ -52,6 +52,41 @@ public sealed class RepairRequestPartRepository(AppDbContext dbContext) : IRepai
             .SingleAsync(item => item.Id == usage.Id, cancellationToken);
     }
 
+    public async Task<bool> RemoveWithStockIncrementAsync(
+        int repairRequestId,
+        int id,
+        CancellationToken cancellationToken = default)
+    {
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        var usage = await dbContext.RepairRequestParts
+            .SingleOrDefaultAsync(
+                item => item.Id == id && item.RepairRequestId == repairRequestId,
+                cancellationToken);
+        if (usage is null)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return false;
+        }
+
+        var rowsUpdated = await dbContext.Parts
+            .Where(part => part.Id == usage.PartId)
+            .ExecuteUpdateAsync(
+                setters => setters.SetProperty(
+                    part => part.StockQuantity,
+                    part => part.StockQuantity + usage.Quantity),
+                cancellationToken);
+        if (rowsUpdated == 0)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return false;
+        }
+
+        dbContext.RepairRequestParts.Remove(usage);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return true;
+    }
+
     private static IQueryable<RepairRequestPart> WithDetails(IQueryable<RepairRequestPart> query) =>
         query.Include(item => item.Part);
 }

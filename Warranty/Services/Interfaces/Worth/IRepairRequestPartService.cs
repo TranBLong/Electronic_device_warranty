@@ -16,4 +16,10 @@ public interface IRepairRequestPartService
         int technicianId,
         UserRole role,
         CancellationToken cancellationToken = default);
+    Task RemoveAsync(
+        int repairRequestId,
+        int id,
+        int technicianId,
+        UserRole role,
+        CancellationToken cancellationToken = default);
 }

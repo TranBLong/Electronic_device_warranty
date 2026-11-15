@@ -12,4 +12,8 @@ public interface IRepairRequestPartRepository
         int partId,
         int quantity,
         CancellationToken cancellationToken = default);
+    Task<bool> RemoveWithStockIncrementAsync(
+        int repairRequestId,
+        int id,
+        CancellationToken cancellationToken = default);
 }

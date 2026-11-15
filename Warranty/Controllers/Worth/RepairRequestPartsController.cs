@@ -43,4 +43,21 @@ public sealed class RepairRequestPartsController(IRepairRequestPartService repai
             repairRequestId, request, technicianId, role, cancellationToken);
         return CreatedAtAction(nameof(GetByRepairRequestId), new { repairRequestId }, usage);
     }
+
+    [Authorize(Roles = nameof(UserRole.Technician))]
+    [HttpDelete("{id:int}")]
+    public async Task<IActionResult> Remove(
+        int repairRequestId,
+        int id,
+        CancellationToken cancellationToken)
+    {
+        if (!User.TryGetUserId(out var technicianId) || !User.TryGetUserRole(out var role))
+        {
+            return Unauthorized();
+        }
+
+        await repairRequestPartService.RemoveAsync(
+            repairRequestId, id, technicianId, role, cancellationToken);
+        return NoContent();
+    }
 }
