@@ -5,9 +5,15 @@ namespace Warranty.Services.Interfaces.Important;
 
 public interface IRepairRequestService
 {
-    Task<IReadOnlyList<RepairRequestResponse>> GetAllAsync(
+    Task<PagedResult<RepairRequestResponse>> GetAllAsync(
         int userId,
         UserRole role,
+        RepairRequestStatus? status,
+        int? technicianId,
+        DateTime? createdFrom,
+        DateTime? createdTo,
+        int page,
+        int pageSize,
         CancellationToken cancellationToken = default);
     Task<RepairRequestResponse> GetByIdAsync(
         int id,

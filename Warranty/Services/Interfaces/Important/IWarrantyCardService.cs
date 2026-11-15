@@ -5,9 +5,13 @@ namespace Warranty.Services.Interfaces.Important;
 
 public interface IWarrantyCardService
 {
-    Task<IReadOnlyList<WarrantyCardResponse>> GetAllAsync(
+    Task<PagedResult<WarrantyCardResponse>> GetAllAsync(
         int userId,
         UserRole role,
+        WarrantyStatus? status,
+        string? keyword,
+        int page,
+        int pageSize,
         CancellationToken cancellationToken = default);
     Task<WarrantyCardResponse> GetByIdAsync(
         int id,

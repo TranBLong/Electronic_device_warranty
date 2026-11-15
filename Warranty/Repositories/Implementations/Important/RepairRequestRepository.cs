@@ -29,6 +29,23 @@ public sealed class RepairRequestRepository(AppDbContext dbContext) : IRepairReq
             .OrderByDescending(request => request.CreatedAt)
             .ToListAsync(cancellationToken);
 
+    public async Task<IReadOnlyList<RepairRequest>> SearchAsync(
+        int? customerId, int? assignedTechnicianId, RepairRequestStatus? status, int? filterTechnicianId,
+        DateTime? createdFrom, DateTime? createdTo, int page, int pageSize,
+        CancellationToken cancellationToken = default)
+    {
+        var query = ApplySearchFilter(WithDetails(dbContext.RepairRequests.AsNoTracking()), customerId,
+            assignedTechnicianId, status, filterTechnicianId, createdFrom, createdTo);
+        return await query.OrderByDescending(request => request.CreatedAt).ThenByDescending(request => request.Id)
+            .Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(cancellationToken);
+    }
+
+    public Task<int> CountSearchAsync(
+        int? customerId, int? assignedTechnicianId, RepairRequestStatus? status, int? filterTechnicianId,
+        DateTime? createdFrom, DateTime? createdTo, CancellationToken cancellationToken = default) =>
+        ApplySearchFilter(dbContext.RepairRequests.AsNoTracking(), customerId, assignedTechnicianId,
+            status, filterTechnicianId, createdFrom, createdTo).CountAsync(cancellationToken);
+
     public Task<RepairRequest?> GetByIdAsync(
         int id,
         bool tracking = false,
@@ -73,4 +90,17 @@ public sealed class RepairRequestRepository(AppDbContext dbContext) : IRepairReq
             .ThenInclude(card => card.Customer)
             .Include(request => request.Technician)
             .Include(request => request.StatusHistory.OrderBy(history => history.ChangedAt));
+
+    private static IQueryable<RepairRequest> ApplySearchFilter(
+        IQueryable<RepairRequest> query, int? customerId, int? assignedTechnicianId, RepairRequestStatus? status,
+        int? filterTechnicianId, DateTime? createdFrom, DateTime? createdTo)
+    {
+        if (customerId.HasValue) query = query.Where(request => request.WarrantyCard.CustomerId == customerId.Value);
+        if (assignedTechnicianId.HasValue) query = query.Where(request => request.TechnicianId == assignedTechnicianId.Value);
+        if (status.HasValue) query = query.Where(request => request.Status == status.Value);
+        if (filterTechnicianId.HasValue) query = query.Where(request => request.TechnicianId == filterTechnicianId.Value);
+        if (createdFrom.HasValue) query = query.Where(request => request.CreatedAt >= createdFrom.Value);
+        if (createdTo.HasValue) query = query.Where(request => request.CreatedAt <= createdTo.Value);
+        return query;
+    }
 }

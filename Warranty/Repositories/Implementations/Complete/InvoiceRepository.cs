@@ -32,16 +32,13 @@ public sealed class InvoiceRepository(AppDbContext dbContext) : IInvoiceReposito
 
     public async Task<IReadOnlyList<Invoice>> GetAllAsync(
         InvoiceStatus? status,
+        DateTime? issuedFrom,
+        DateTime? issuedTo,
         int page,
         int pageSize,
         CancellationToken cancellationToken = default)
     {
-        var query = WithDetails(dbContext.Invoices.AsNoTracking());
-        if (status.HasValue)
-        {
-            query = query.Where(invoice => invoice.Status == status.Value);
-        }
-
+        var query = ApplyFilter(WithDetails(dbContext.Invoices.AsNoTracking()), status, issuedFrom, issuedTo, null);
         return await query.OrderByDescending(invoice => invoice.IssuedAt)
             .ThenByDescending(invoice => invoice.Id)
             .Skip((page - 1) * pageSize)
@@ -51,11 +48,13 @@ public sealed class InvoiceRepository(AppDbContext dbContext) : IInvoiceReposito
 
     public async Task<IReadOnlyList<Invoice>> GetForCustomerAsync(
         int customerId,
+        InvoiceStatus? status,
+        DateTime? issuedFrom,
+        DateTime? issuedTo,
         int page,
         int pageSize,
         CancellationToken cancellationToken = default) =>
-        await WithDetails(dbContext.Invoices.AsNoTracking())
-            .Where(invoice => invoice.RepairRequest.WarrantyCard.CustomerId == customerId)
+        await ApplyFilter(WithDetails(dbContext.Invoices.AsNoTracking()), status, issuedFrom, issuedTo, customerId)
             .OrderByDescending(invoice => invoice.IssuedAt)
             .ThenByDescending(invoice => invoice.Id)
             .Skip((page - 1) * pageSize)
@@ -64,22 +63,12 @@ public sealed class InvoiceRepository(AppDbContext dbContext) : IInvoiceReposito
 
     public Task<int> CountAsync(
         InvoiceStatus? status,
+        DateTime? issuedFrom,
+        DateTime? issuedTo,
         int? customerId,
-        CancellationToken cancellationToken = default)
-    {
-        var query = dbContext.Invoices.AsNoTracking().AsQueryable();
-        if (status.HasValue)
-        {
-            query = query.Where(invoice => invoice.Status == status.Value);
-        }
-
-        if (customerId.HasValue)
-        {
-            query = query.Where(invoice => invoice.RepairRequest.WarrantyCard.CustomerId == customerId.Value);
-        }
-
-        return query.CountAsync(cancellationToken);
-    }
+        CancellationToken cancellationToken = default) =>
+        ApplyFilter(dbContext.Invoices.AsNoTracking(), status, issuedFrom, issuedTo, customerId)
+            .CountAsync(cancellationToken);
 
     public Task<bool> ExistsForRepairRequestAsync(int repairRequestId, CancellationToken cancellationToken = default) =>
         dbContext.Invoices.AsNoTracking().AnyAsync(
@@ -110,4 +99,14 @@ public sealed class InvoiceRepository(AppDbContext dbContext) : IInvoiceReposito
             .Include(invoice => invoice.RepairRequest)
                 .ThenInclude(request => request.Parts)
                     .ThenInclude(item => item.Part);
+
+    private static IQueryable<Invoice> ApplyFilter(
+        IQueryable<Invoice> query, InvoiceStatus? status, DateTime? issuedFrom, DateTime? issuedTo, int? customerId)
+    {
+        if (status.HasValue) query = query.Where(invoice => invoice.Status == status.Value);
+        if (issuedFrom.HasValue) query = query.Where(invoice => invoice.IssuedAt >= issuedFrom.Value);
+        if (issuedTo.HasValue) query = query.Where(invoice => invoice.IssuedAt <= issuedTo.Value);
+        if (customerId.HasValue) query = query.Where(invoice => invoice.RepairRequest.WarrantyCard.CustomerId == customerId.Value);
+        return query;
+    }
 }

@@ -57,16 +57,21 @@ public sealed class InvoicesController(IInvoiceService invoiceService) : Control
 
     [Authorize(Roles = "Admin,Manager,Receptionist")]
     [HttpGet("invoices")]
-    public async Task<ActionResult<PagedResponseDto<InvoiceListResponseDto>>> GetAll(
+    public async Task<ActionResult<PagedResult<InvoiceListResponseDto>>> GetAll(
         [FromQuery] InvoiceStatus? status,
+        [FromQuery] DateTime? issuedFrom,
+        [FromQuery] DateTime? issuedTo,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20,
         CancellationToken cancellationToken = default) =>
-        Ok(await invoiceService.GetAllAsync(status, page, pageSize, cancellationToken));
+        Ok(await invoiceService.GetAllAsync(status, issuedFrom, issuedTo, page, pageSize, cancellationToken));
 
     [Authorize(Roles = nameof(UserRole.Customer))]
     [HttpGet("invoices/my")]
-    public async Task<ActionResult<PagedResponseDto<InvoiceListResponseDto>>> GetMine(
+    public async Task<ActionResult<PagedResult<InvoiceListResponseDto>>> GetMine(
+        [FromQuery] InvoiceStatus? status,
+        [FromQuery] DateTime? issuedFrom,
+        [FromQuery] DateTime? issuedTo,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20,
         CancellationToken cancellationToken = default)
@@ -76,7 +81,7 @@ public sealed class InvoicesController(IInvoiceService invoiceService) : Control
             return Unauthorized();
         }
 
-        return Ok(await invoiceService.GetMineAsync(customerId, page, pageSize, cancellationToken));
+        return Ok(await invoiceService.GetMineAsync(customerId, status, issuedFrom, issuedTo, page, pageSize, cancellationToken));
     }
 
     [Authorize(Roles = "Receptionist,Manager")]

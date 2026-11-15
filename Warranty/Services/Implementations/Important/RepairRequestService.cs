@@ -16,20 +16,41 @@ public sealed class RepairRequestService(
     IInvoiceRepository invoiceRepository,
     ILogger<RepairRequestService>? logger = null) : IRepairRequestService
 {
-    public async Task<IReadOnlyList<RepairRequestResponse>> GetAllAsync(
+    public async Task<PagedResult<RepairRequestResponse>> GetAllAsync(
         int userId,
         UserRole role,
+        RepairRequestStatus? status,
+        int? technicianId,
+        DateTime? createdFrom,
+        DateTime? createdTo,
+        int page,
+        int pageSize,
         CancellationToken cancellationToken = default)
     {
-        var requests = role switch
+        ValidatePaging(page, pageSize);
+        int? customerId = null;
+        int? assignedTechnicianId = null;
+        switch (role)
         {
-            UserRole.Customer => await repairRequestRepository.GetByCustomerIdAsync(userId, cancellationToken),
-            UserRole.Technician => await repairRequestRepository.GetByTechnicianIdAsync(userId, cancellationToken),
-            UserRole.Admin or UserRole.Manager or UserRole.Receptionist =>
-                await repairRequestRepository.GetAllAsync(cancellationToken),
-            _ => throw new ForbiddenException("You are not allowed to view repair requests.")
-        };
-        return requests.Select(ToResponse).ToList();
+            case UserRole.Customer: customerId = userId; break;
+            case UserRole.Technician: assignedTechnicianId = userId; break;
+            case UserRole.Admin:
+            case UserRole.Manager:
+            case UserRole.Receptionist: break;
+            default: throw new ForbiddenException("You are not allowed to view repair requests.");
+        }
+        var requests = await repairRequestRepository.SearchAsync(customerId, assignedTechnicianId, status,
+            technicianId, createdFrom, createdTo, page, pageSize, cancellationToken);
+        var total = await repairRequestRepository.CountSearchAsync(customerId, assignedTechnicianId, status,
+            technicianId, createdFrom, createdTo, cancellationToken);
+        return new PagedResult<RepairRequestResponse>(requests.Select(ToResponse).ToList(), page, pageSize, total,
+            total == 0 ? 0 : (int)Math.Ceiling(total / (double)pageSize));
+    }
+
+    private static void ValidatePaging(int page, int pageSize)
+    {
+        if (page < 1 || pageSize is < 1 or > 100 || (long)(page - 1) * pageSize > int.MaxValue)
+            throw new BusinessRuleException("Page must be positive and pageSize must be between 1 and 100.");
     }
 
     public async Task<RepairRequestResponse> GetByIdAsync(

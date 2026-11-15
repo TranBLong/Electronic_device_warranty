@@ -13,14 +13,19 @@ namespace Warranty.Controllers;
 public sealed class WarrantyCardsController(IWarrantyCardService warrantyCardService) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<IReadOnlyList<WarrantyCardResponse>>> GetAll(CancellationToken cancellationToken)
+    public async Task<ActionResult<PagedResult<WarrantyCardResponse>>> GetAll(
+        [FromQuery] WarrantyStatus? status = null,
+        [FromQuery] string? keyword = null,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20,
+        CancellationToken cancellationToken = default)
     {
         if (!TryGetIdentity(out var userId, out var role))
         {
             return Unauthorized();
         }
 
-        return Ok(await warrantyCardService.GetAllAsync(userId, role, cancellationToken));
+        return Ok(await warrantyCardService.GetAllAsync(userId, role, status, keyword, page, pageSize, cancellationToken));
     }
 
     [HttpGet("{id:int}")]

@@ -9,6 +9,8 @@ public interface IWarrantyCardRepository
     Task<IReadOnlyList<WarrantyCard>> GetByCustomerIdAsync(
         int customerId,
         CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<WarrantyCard>> SearchAsync(int? customerId, WarrantyStatus? status, string? keyword, int page, int pageSize, CancellationToken cancellationToken = default);
+    Task<int> CountSearchAsync(int? customerId, WarrantyStatus? status, string? keyword, CancellationToken cancellationToken = default);
     Task<WarrantyCard?> GetByIdAsync(int id, CancellationToken cancellationToken = default);
     Task<int> CountAsync(CancellationToken cancellationToken = default);
     Task<int> CountActiveUnexpiredAsync(DateTime today, CancellationToken cancellationToken = default);

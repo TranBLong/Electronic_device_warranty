@@ -15,7 +15,9 @@ using Warranty.Exceptions;
 using Warranty.Models;
 using Warranty.Repositories.Implementations.Important;
 using Warranty.Repositories.Implementations.Complete;
+using Warranty.Repositories.Implementations.Worth;
 using Warranty.Services.Implementations.Important;
+using Warranty.Services.Implementations.Complete;
 using Warranty.Services;
 using Warranty.Services.Interfaces.Important;
 
@@ -310,7 +312,102 @@ public sealed class WarrantyApiTests
         await using var testDatabase = await TestDatabase.CreateAsync();
         var controller = WithUser(CreateWarrantyCardsController(testDatabase.Context), 1, UserRole.Manager);
 
-        await Assert.ThrowsAsync<ForbiddenException>(() => controller.GetAll(CancellationToken.None));
+        await Assert.ThrowsAsync<ForbiddenException>(() => controller.GetAll(
+            null, null, 1, 20, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task WarrantyCards_GetAll_Customer_OnlyOwn_KeywordAndPaging()
+    {
+        await using var database = await TestDatabase.CreateAsync();
+        var customer = NewUser("page-customer@example.com", UserRole.Customer);
+        var otherCustomer = NewUser("other-customer@example.com", UserRole.Customer);
+        var firstProduct = NewProduct();
+        firstProduct.SerialNumber = "MATCH-001";
+        var secondProduct = NewProduct();
+        secondProduct.SerialNumber = "MATCH-002";
+        var otherProduct = NewProduct();
+        otherProduct.SerialNumber = "MATCH-003";
+        database.Context.WarrantyCards.AddRange(
+            new WarrantyCard { Product = firstProduct, Customer = customer, StartDate = DateTime.UtcNow.Date, EndDate = DateTime.UtcNow.Date.AddMonths(12) },
+            new WarrantyCard { Product = secondProduct, Customer = customer, StartDate = DateTime.UtcNow.Date.AddDays(-1), EndDate = DateTime.UtcNow.Date.AddMonths(12) },
+            new WarrantyCard { Product = otherProduct, Customer = otherCustomer, StartDate = DateTime.UtcNow.Date, EndDate = DateTime.UtcNow.Date.AddMonths(12) });
+        await database.Context.SaveChangesAsync();
+        var controller = WithUser(CreateWarrantyCardsController(database.Context), customer.Id, UserRole.Customer);
+
+        var result = await controller.GetAll(null, "MATCH", 1, 1, CancellationToken.None);
+        var page = Assert.IsType<PagedResult<WarrantyCardResponse>>(Assert.IsType<OkObjectResult>(result.Result).Value);
+
+        Assert.Equal(2, page.TotalCount);
+        Assert.Equal(2, page.TotalPages);
+        Assert.Single(page.Items);
+        Assert.Equal("MATCH-002", page.Items[0].SerialNumber);
+    }
+
+    [Fact]
+    public async Task RepairRequests_GetAll_FilterStatusAndCreatedRange_RespectsRoleScope()
+    {
+        await using var database = await TestDatabase.CreateAsync();
+        var customer = NewUser("repair-page-customer@example.com", UserRole.Customer);
+        var technician = NewUser("repair-page-tech@example.com", UserRole.Technician);
+        var otherTechnician = NewUser("repair-page-other@example.com", UserRole.Technician);
+        var product = NewProduct();
+        var card = new WarrantyCard
+        {
+            Product = product, Customer = customer, StartDate = DateTime.UtcNow.Date,
+            EndDate = DateTime.UtcNow.Date.AddMonths(12)
+        };
+        var inRange = new RepairRequest
+        {
+            WarrantyCard = card, Technician = technician, Description = "In range",
+            Status = RepairRequestStatus.InProgress, CreatedAt = DateTime.UtcNow.AddDays(-1)
+        };
+        var wrongStatus = new RepairRequest
+        {
+            WarrantyCard = card, Technician = technician, Description = "Wrong status",
+            Status = RepairRequestStatus.Completed, CreatedAt = DateTime.UtcNow
+        };
+        var wrongOwner = new RepairRequest
+        {
+            WarrantyCard = card, Technician = otherTechnician, Description = "Other technician",
+            Status = RepairRequestStatus.InProgress, CreatedAt = DateTime.UtcNow
+        };
+        database.Context.RepairRequests.AddRange(inRange, wrongStatus, wrongOwner);
+        await database.Context.SaveChangesAsync();
+        var controller = WithUser(CreateRepairRequestsController(database.Context), technician.Id, UserRole.Technician);
+
+        var result = await controller.GetAll(
+            RepairRequestStatus.InProgress, null, DateTime.UtcNow.AddDays(-2), DateTime.UtcNow.AddHours(-12), 1, 20,
+            CancellationToken.None);
+        var page = Assert.IsType<PagedResult<RepairRequestResponse>>(Assert.IsType<OkObjectResult>(result.Result).Value);
+
+        Assert.Equal(1, page.TotalCount);
+        Assert.Equal(inRange.Id, Assert.Single(page.Items).Id);
+    }
+
+    [Fact]
+    public async Task Invoices_GetAll_FilterIssuedAt_ReturnsTotalPages()
+    {
+        await using var database = await TestDatabase.CreateAsync();
+        var requests = await database.Context.RepairRequests.Take(3).ToListAsync();
+        var issuer = await database.Context.Users.FirstAsync(user => user.Role == UserRole.Receptionist);
+        var start = DateTime.UtcNow.Date.AddDays(-10);
+        database.Context.Invoices.AddRange(
+            new Invoice { RepairRequestId = requests[0].Id, InvoiceNumber = "PAGE-INV-1", IssuedById = issuer.Id, IssuedAt = start.AddDays(1), TotalAmount = 10m },
+            new Invoice { RepairRequestId = requests[1].Id, InvoiceNumber = "PAGE-INV-2", IssuedById = issuer.Id, IssuedAt = start.AddDays(2), TotalAmount = 10m },
+            new Invoice { RepairRequestId = requests[2].Id, InvoiceNumber = "PAGE-INV-3", IssuedById = issuer.Id, IssuedAt = start.AddDays(8), TotalAmount = 10m });
+        await database.Context.SaveChangesAsync();
+        var service = new InvoiceService(
+            new InvoiceRepository(database.Context),
+            new RepairRequestRepository(database.Context),
+            new RepairRequestPartRepository(database.Context));
+
+        var page = await service.GetAllAsync(null, start, start.AddDays(3), 1, 1);
+
+        Assert.Equal(2, page.TotalCount);
+        Assert.Equal(2, page.TotalPages);
+        Assert.Single(page.Items);
+        Assert.Equal("PAGE-INV-2", page.Items[0].InvoiceNumber);
     }
 
     [Fact]

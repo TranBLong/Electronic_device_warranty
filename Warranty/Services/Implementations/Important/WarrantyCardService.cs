@@ -12,18 +12,32 @@ public sealed class WarrantyCardService(
     IProductRepository productRepository,
     IUserRepository userRepository) : IWarrantyCardService
 {
-    public async Task<IReadOnlyList<WarrantyCardResponse>> GetAllAsync(
+    public async Task<PagedResult<WarrantyCardResponse>> GetAllAsync(
         int userId,
         UserRole role,
+        WarrantyStatus? status,
+        string? keyword,
+        int page,
+        int pageSize,
         CancellationToken cancellationToken = default)
     {
-        var cards = role switch
+        ValidatePaging(page, pageSize);
+        int? customerId = role switch
         {
-            UserRole.Customer => await warrantyCardRepository.GetByCustomerIdAsync(userId, cancellationToken),
-            UserRole.Admin or UserRole.Receptionist => await warrantyCardRepository.GetAllAsync(cancellationToken),
+            UserRole.Customer => userId,
+            UserRole.Admin or UserRole.Receptionist => null,
             _ => throw new ForbiddenException("You are not allowed to view warranty cards.")
         };
-        return cards.Select(ToResponse).ToList();
+        var cards = await warrantyCardRepository.SearchAsync(customerId, status, keyword, page, pageSize, cancellationToken);
+        var total = await warrantyCardRepository.CountSearchAsync(customerId, status, keyword, cancellationToken);
+        return new PagedResult<WarrantyCardResponse>(cards.Select(ToResponse).ToList(), page, pageSize, total,
+            total == 0 ? 0 : (int)Math.Ceiling(total / (double)pageSize));
+    }
+
+    private static void ValidatePaging(int page, int pageSize)
+    {
+        if (page < 1 || pageSize is < 1 or > 100 || (long)(page - 1) * pageSize > int.MaxValue)
+            throw new BusinessRuleException("Page must be positive and pageSize must be between 1 and 100.");
     }
 
     public async Task<WarrantyCardResponse> GetByIdAsync(

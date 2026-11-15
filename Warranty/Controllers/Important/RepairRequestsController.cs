@@ -13,15 +13,21 @@ namespace Warranty.Controllers;
 public sealed class RepairRequestsController(IRepairRequestService repairRequestService) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<IReadOnlyList<RepairRequestResponse>>> GetAll(
-        CancellationToken cancellationToken)
+    public async Task<ActionResult<PagedResult<RepairRequestResponse>>> GetAll(
+        [FromQuery] RepairRequestStatus? status = null,
+        [FromQuery] int? technicianId = null,
+        [FromQuery] DateTime? createdFrom = null,
+        [FromQuery] DateTime? createdTo = null,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20,
+        CancellationToken cancellationToken = default)
     {
         if (!TryGetIdentity(out var userId, out var role))
         {
             return Unauthorized();
         }
 
-        return Ok(await repairRequestService.GetAllAsync(userId, role, cancellationToken));
+        return Ok(await repairRequestService.GetAllAsync(userId, role, status, technicianId, createdFrom, createdTo, page, pageSize, cancellationToken));
     }
 
     [HttpGet("{id:int}")]

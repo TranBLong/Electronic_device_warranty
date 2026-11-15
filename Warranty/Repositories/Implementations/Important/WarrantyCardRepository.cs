@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Warranty.Data;
+using Warranty.Enums;
 using Warranty.Models;
 using Warranty.Repositories.Interfaces.Important;
 
@@ -20,6 +21,21 @@ public sealed class WarrantyCardRepository(AppDbContext dbContext) : IWarrantyCa
             .OrderByDescending(card => card.StartDate)
             .ToListAsync(cancellationToken);
 
+    public async Task<IReadOnlyList<WarrantyCard>> SearchAsync(
+        int? customerId, WarrantyStatus? status, string? keyword, int page, int pageSize,
+        CancellationToken cancellationToken = default)
+    {
+        var query = ApplySearchFilter(WithDetails(dbContext.WarrantyCards.AsNoTracking()), customerId, status, keyword);
+        return await query.OrderByDescending(card => card.Id)
+            .Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(cancellationToken);
+    }
+
+    public Task<int> CountSearchAsync(
+        int? customerId, WarrantyStatus? status, string? keyword,
+        CancellationToken cancellationToken = default) =>
+        ApplySearchFilter(dbContext.WarrantyCards.AsNoTracking(), customerId, status, keyword)
+            .CountAsync(cancellationToken);
+
     public Task<WarrantyCard?> GetByIdAsync(int id, CancellationToken cancellationToken = default) =>
         WithDetails(dbContext.WarrantyCards.AsNoTracking())
             .SingleOrDefaultAsync(card => card.Id == id, cancellationToken);
@@ -39,4 +55,17 @@ public sealed class WarrantyCardRepository(AppDbContext dbContext) : IWarrantyCa
 
     private static IQueryable<WarrantyCard> WithDetails(IQueryable<WarrantyCard> query) =>
         query.Include(card => card.Product).Include(card => card.Customer);
+
+    private static IQueryable<WarrantyCard> ApplySearchFilter(
+        IQueryable<WarrantyCard> query, int? customerId, WarrantyStatus? status, string? keyword)
+    {
+        if (customerId.HasValue) query = query.Where(card => card.CustomerId == customerId.Value);
+        if (status.HasValue) query = query.Where(card => card.Status == status.Value);
+        if (!string.IsNullOrWhiteSpace(keyword))
+        {
+            var term = keyword.Trim();
+            query = query.Where(card => card.Customer.FullName.Contains(term) || card.Product.SerialNumber.Contains(term));
+        }
+        return query;
+    }
 }

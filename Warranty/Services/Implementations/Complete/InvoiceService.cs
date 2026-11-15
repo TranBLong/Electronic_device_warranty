@@ -108,8 +108,10 @@ public sealed class InvoiceService(
         return ToResponse(invoice);
     }
 
-    public async Task<PagedResponseDto<InvoiceListResponseDto>> GetAllAsync(
+    public async Task<PagedResult<InvoiceListResponseDto>> GetAllAsync(
         InvoiceStatus? status,
+        DateTime? issuedFrom,
+        DateTime? issuedTo,
         int page,
         int pageSize,
         CancellationToken cancellationToken = default)
@@ -120,21 +122,26 @@ public sealed class InvoiceService(
             throw new BusinessRuleException("Invoice status is invalid.");
         }
 
-        var invoices = await invoiceRepository.GetAllAsync(status, page, pageSize, cancellationToken);
-        var count = await invoiceRepository.CountAsync(status, null, cancellationToken);
-        return new PagedResponseDto<InvoiceListResponseDto>(invoices.Select(ToListResponse).ToList(), page, pageSize, count);
+        var invoices = await invoiceRepository.GetAllAsync(status, issuedFrom, issuedTo, page, pageSize, cancellationToken);
+        var count = await invoiceRepository.CountAsync(status, issuedFrom, issuedTo, null, cancellationToken);
+        return new PagedResult<InvoiceListResponseDto>(invoices.Select(ToListResponse).ToList(), page, pageSize, count,
+            count == 0 ? 0 : (int)Math.Ceiling(count / (double)pageSize));
     }
 
-    public async Task<PagedResponseDto<InvoiceListResponseDto>> GetMineAsync(
+    public async Task<PagedResult<InvoiceListResponseDto>> GetMineAsync(
         int customerId,
+        InvoiceStatus? status,
+        DateTime? issuedFrom,
+        DateTime? issuedTo,
         int page,
         int pageSize,
         CancellationToken cancellationToken = default)
     {
         ValidatePaging(page, pageSize);
-        var invoices = await invoiceRepository.GetForCustomerAsync(customerId, page, pageSize, cancellationToken);
-        var count = await invoiceRepository.CountAsync(null, customerId, cancellationToken);
-        return new PagedResponseDto<InvoiceListResponseDto>(invoices.Select(ToListResponse).ToList(), page, pageSize, count);
+        var invoices = await invoiceRepository.GetForCustomerAsync(customerId, status, issuedFrom, issuedTo, page, pageSize, cancellationToken);
+        var count = await invoiceRepository.CountAsync(status, issuedFrom, issuedTo, customerId, cancellationToken);
+        return new PagedResult<InvoiceListResponseDto>(invoices.Select(ToListResponse).ToList(), page, pageSize, count,
+            count == 0 ? 0 : (int)Math.Ceiling(count / (double)pageSize));
     }
 
     public async Task CancelAsync(
