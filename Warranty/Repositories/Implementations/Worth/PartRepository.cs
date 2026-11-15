@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Warranty.Data;
 using Warranty.Models;
+using Warranty.Dtos;
 using Warranty.Repositories.Interfaces.Worth;
 
 namespace Warranty.Repositories.Implementations.Worth;
@@ -57,6 +58,14 @@ public sealed class PartRepository(AppDbContext dbContext) : IPartRepository
 
     public Task<bool> HasRepairRequestPartsAsync(int id, CancellationToken cancellationToken = default) =>
         dbContext.RepairRequestParts.AsNoTracking().AnyAsync(item => item.PartId == id, cancellationToken);
+
+    public async Task<IReadOnlyList<LowStockPartItem>> GetLowStockAsync(
+        int threshold, CancellationToken cancellationToken = default) =>
+        await dbContext.Parts.AsNoTracking()
+            .Where(part => part.IsActive && part.StockQuantity <= threshold)
+            .OrderBy(part => part.StockQuantity).ThenBy(part => part.Name)
+            .Select(part => new LowStockPartItem(part.Id, part.PartNumber, part.Name, part.StockQuantity))
+            .ToListAsync(cancellationToken);
 
     public async Task AddAsync(Part part, CancellationToken cancellationToken = default) =>
         await dbContext.Parts.AddAsync(part, cancellationToken);

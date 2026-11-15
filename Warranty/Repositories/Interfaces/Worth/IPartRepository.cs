@@ -1,4 +1,5 @@
 using Warranty.Models;
+using Warranty.Dtos;
 
 namespace Warranty.Repositories.Interfaces.Worth;
 
@@ -16,6 +17,7 @@ public interface IPartRepository
         int? exceptId = null,
         CancellationToken cancellationToken = default);
     Task<bool> HasRepairRequestPartsAsync(int id, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<LowStockPartItem>> GetLowStockAsync(int threshold, CancellationToken cancellationToken = default);
     Task AddAsync(Part part, CancellationToken cancellationToken = default);
     void Remove(Part part);
     Task SaveChangesAsync(CancellationToken cancellationToken = default);

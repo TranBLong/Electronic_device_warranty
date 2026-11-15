@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Warranty.Data;
 using Warranty.Models;
+using Warranty.Dtos;
 using Warranty.Repositories.Interfaces.Worth;
 
 namespace Warranty.Repositories.Implementations.Worth;
@@ -86,6 +87,15 @@ public sealed class RepairRequestPartRepository(AppDbContext dbContext) : IRepai
         await transaction.CommitAsync(cancellationToken);
         return true;
     }
+
+    public async Task<IReadOnlyList<TopPartItem>> GetTopPartsAsync(
+        int top, CancellationToken cancellationToken = default) =>
+        await dbContext.RepairRequestParts.AsNoTracking()
+            .GroupBy(item => new { item.PartId, item.Part.PartNumber, item.Part.Name })
+            .Select(group => new TopPartItem(group.Key.PartId, group.Key.PartNumber, group.Key.Name,
+                group.Sum(item => item.Quantity), group.Sum(item => item.Quantity * item.UnitPrice)))
+            .OrderByDescending(item => item.TotalQuantity).ThenByDescending(item => item.TotalAmount)
+            .Take(top).ToListAsync(cancellationToken);
 
     private static IQueryable<RepairRequestPart> WithDetails(IQueryable<RepairRequestPart> query) =>
         query.Include(item => item.Part);

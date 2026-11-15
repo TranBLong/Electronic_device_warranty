@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using Warranty.Data;
 using Warranty.Models;
+using Warranty.Enums;
 using Warranty.Repositories.Interfaces.Complete;
 
 namespace Warranty.Repositories.Implementations.Complete;
@@ -26,6 +27,17 @@ public sealed class PaymentRepository(AppDbContext dbContext) : IPaymentReposito
             .Where(payment => payment.InvoiceId == invoiceId)
             .SumAsync(payment => (decimal?)payment.Amount, cancellationToken)
             ?? 0m;
+
+    public async Task<IReadOnlyList<(int Year, int Month, decimal Total)>> GetMonthlyRevenueAsync(
+        DateTime from, DateTime to, CancellationToken cancellationToken = default) =>
+        await dbContext.Payments.AsNoTracking()
+            .Where(payment => payment.PaidAt >= from && payment.PaidAt < to.AddDays(1) &&
+                              payment.Invoice.Status != InvoiceStatus.Cancelled)
+            .GroupBy(payment => new { payment.PaidAt.Year, payment.PaidAt.Month })
+            .Select(group => new ValueTuple<int, int, decimal>(
+                group.Key.Year, group.Key.Month, group.Sum(payment => payment.Amount)))
+            .OrderBy(row => row.Item1).ThenBy(row => row.Item2)
+            .ToListAsync(cancellationToken);
 
     public async Task AddAsync(Payment payment, CancellationToken cancellationToken = default) =>
         await dbContext.Payments.AddAsync(payment, cancellationToken);

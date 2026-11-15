@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Warranty.Data;
 using Warranty.Models;
+using Warranty.Dtos;
 using Warranty.Repositories.Interfaces.Complete;
 
 namespace Warranty.Repositories.Implementations.Complete;
@@ -42,6 +43,20 @@ public sealed class FeedbackRepository(AppDbContext dbContext) : IFeedbackReposi
         }
 
         return query.CountAsync(cancellationToken);
+    }
+
+    public async Task<FeedbackReportResponse> GetRatingSummaryAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var groups = await dbContext.Feedbacks.AsNoTracking()
+            .GroupBy(feedback => feedback.Rating)
+            .Select(group => new { Rating = group.Key, Count = group.Count() })
+            .ToListAsync(cancellationToken);
+        var total = groups.Sum(group => group.Count);
+        double? average = total == 0 ? null : groups.Sum(group => group.Rating * group.Count) / (double)total;
+        var byRating = Enumerable.Range(1, 5).Select(rating => new FeedbackRatingItem(
+            rating, groups.FirstOrDefault(group => group.Rating == rating)?.Count ?? 0)).ToList();
+        return new FeedbackReportResponse(average, total, byRating);
     }
 
     public async Task AddAsync(Feedback feedback, CancellationToken cancellationToken = default) =>

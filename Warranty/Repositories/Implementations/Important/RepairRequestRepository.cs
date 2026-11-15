@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Warranty.Data;
 using Warranty.Enums;
 using Warranty.Models;
+using Warranty.Dtos;
 using Warranty.Repositories.Interfaces.Important;
 
 namespace Warranty.Repositories.Implementations.Important;
@@ -83,6 +84,48 @@ public sealed class RepairRequestRepository(AppDbContext dbContext) : IRepairReq
         dbContext.Notifications.Add(notification);
         await dbContext.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<TechnicianPerformanceItem>> GetTechnicianPerformanceAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var durations = await dbContext.RepairRequests.AsNoTracking()
+            .Where(request => request.TechnicianId != null && request.Status == RepairRequestStatus.Completed)
+            .Select(request => new
+            {
+                TechnicianId = request.TechnicianId!.Value,
+                StartedAt = request.StatusHistory
+                    .Where(history => history.NewStatus == RepairRequestStatus.InProgress ||
+                                      history.NewStatus == RepairRequestStatus.Received)
+                    .OrderBy(history => history.ChangedAt)
+                    .Select(history => (DateTime?)history.ChangedAt).FirstOrDefault(),
+                CompletedAt = request.StatusHistory
+                    .Where(history => history.NewStatus == RepairRequestStatus.Completed)
+                    .OrderByDescending(history => history.ChangedAt)
+                    .Select(history => (DateTime?)history.ChangedAt).FirstOrDefault()
+            }).ToListAsync(cancellationToken);
+
+        var averages = durations
+            .Where(row => row.StartedAt.HasValue && row.CompletedAt.HasValue && row.CompletedAt >= row.StartedAt)
+            .GroupBy(row => row.TechnicianId)
+            .ToDictionary(group => group.Key,
+                group => group.Average(row => (row.CompletedAt!.Value - row.StartedAt!.Value).TotalHours));
+
+        var technicians = await dbContext.Users.AsNoTracking()
+            .Where(user => user.Role == UserRole.Technician)
+            .Select(user => new
+            {
+                user.Id,
+                user.FullName,
+                AssignedCount = dbContext.RepairRequests.Count(request => request.TechnicianId == user.Id),
+                CompletedCount = dbContext.RepairRequests.Count(request =>
+                    request.TechnicianId == user.Id && request.Status == RepairRequestStatus.Completed)
+            })
+            .OrderBy(user => user.FullName).ToListAsync(cancellationToken);
+
+        return technicians.Select(user => new TechnicianPerformanceItem(
+            user.Id, user.FullName, user.AssignedCount, user.CompletedCount,
+            averages.TryGetValue(user.Id, out var hours) ? hours : null)).ToList();
     }
 
     private static IQueryable<RepairRequest> WithDetails(IQueryable<RepairRequest> query) =>

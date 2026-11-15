@@ -1,5 +1,6 @@
 using Warranty.Enums;
 using Warranty.Models;
+using Warranty.Dtos;
 
 namespace Warranty.Repositories.Interfaces.Important;
 
@@ -22,5 +23,7 @@ public interface IRepairRequestRepository
     Task SaveStatusChangeAsync(
         RepairRequest repairRequest,
         Notification notification,
+        CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<TechnicianPerformanceItem>> GetTechnicianPerformanceAsync(
         CancellationToken cancellationToken = default);
 }

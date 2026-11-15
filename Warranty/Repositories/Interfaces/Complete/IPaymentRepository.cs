@@ -6,6 +6,8 @@ public interface IPaymentRepository
 {
     Task<IReadOnlyList<Payment>> GetByInvoiceIdAsync(int invoiceId, CancellationToken cancellationToken = default);
     Task<decimal> GetTotalByInvoiceIdAsync(int invoiceId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<(int Year, int Month, decimal Total)>> GetMonthlyRevenueAsync(
+        DateTime from, DateTime to, CancellationToken cancellationToken = default);
     Task AddAsync(Payment payment, CancellationToken cancellationToken = default);
     Task AddNotificationAsync(Notification notification, CancellationToken cancellationToken = default);
     Task SaveChangesAsync(CancellationToken cancellationToken = default);

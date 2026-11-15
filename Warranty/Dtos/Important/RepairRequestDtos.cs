@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using Warranty.Enums;
+using System.Collections.Generic;
 
 namespace Warranty.Dtos;
 
@@ -80,3 +81,16 @@ public sealed record DashboardSummaryResponse(
     int ReceivedRepairRequests,
     int InProgressRepairRequests,
     int CompletedRepairRequests);
+
+public sealed record MonthlyRevenueItem(int Year, int Month, decimal TotalAmount);
+public sealed record RevenueReportResponse(IReadOnlyList<MonthlyRevenueItem> Items, decimal GrandTotal);
+public sealed record TechnicianPerformanceItem(
+    int TechnicianId, string TechnicianName, int AssignedCount, int CompletedCount, double? AvgHandlingHours);
+public sealed record TechnicianPerformanceResponse(IReadOnlyList<TechnicianPerformanceItem> Items);
+public sealed record TopPartItem(int PartId, string PartNumber, string Name, int TotalQuantity, decimal TotalAmount);
+public sealed record TopPartsReportResponse(IReadOnlyList<TopPartItem> Items);
+public sealed record LowStockPartItem(int PartId, string PartNumber, string Name, int StockQuantity);
+public sealed record LowStockReportResponse(IReadOnlyList<LowStockPartItem> Items);
+public sealed record FeedbackRatingItem(int Rating, int Count);
+public sealed record FeedbackReportResponse(
+    double? AverageRating, int TotalCount, IReadOnlyList<FeedbackRatingItem> ByRating);
