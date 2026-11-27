@@ -1,12 +1,7 @@
 namespace Warranty.Dtos;
 
-/// <summary>Generic paged result for list endpoints.</summary>
-public sealed record PagedResult<T>(
-    IReadOnlyList<T> Items,
-    int Page,
-    int PageSize,
-    int TotalCount,
-    int TotalPages);
+// Canonical PagedResult lives in Dtos/Common/QueryParameters.cs (PageNumber, PageSize, ...).
+// Legacy helper kept for older query shapes.
 
 public sealed class PagedQuery
 {

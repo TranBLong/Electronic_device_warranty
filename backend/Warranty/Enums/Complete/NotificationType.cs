@@ -5,5 +5,6 @@ public enum NotificationType
     RepairStatusChanged,
     TechnicianAssigned,
     WarrantyExpiring,
+    Payment,
     General
 }

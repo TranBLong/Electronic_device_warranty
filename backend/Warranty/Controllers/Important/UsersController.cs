@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using Warranty.Constants;
 using Warranty.Data;
 using Warranty.Dtos;
 using Warranty.Enums;
@@ -69,7 +70,7 @@ public sealed class UsersController(AppDbContext dbContext) : ControllerBase
         return NoContent();
     }
 
-    [Authorize(Roles = "Admin,Receptionist")]
+    [Authorize(Policy = Policies.Staff)]
     [HttpGet("customers")]
     public async Task<ActionResult<IReadOnlyList<UserResponse>>> GetCustomers(CancellationToken cancellationToken)
     {
@@ -82,7 +83,7 @@ public sealed class UsersController(AppDbContext dbContext) : ControllerBase
         return Ok(users);
     }
 
-    [Authorize(Roles = "Admin,Manager,Receptionist")]
+    [Authorize(Policy = Policies.Staff)]
     [HttpGet("technicians")]
     public async Task<ActionResult<IReadOnlyList<UserResponse>>> GetTechnicians(CancellationToken cancellationToken)
     {
@@ -95,16 +96,41 @@ public sealed class UsersController(AppDbContext dbContext) : ControllerBase
         return Ok(users);
     }
 
-    [Authorize(Roles = nameof(UserRole.Admin))]
+    [Authorize(Policy = Policies.CanManageUsers)]
     [HttpGet]
-    public async Task<ActionResult<IReadOnlyList<UserResponse>>> GetAll(CancellationToken cancellationToken)
+    public async Task<ActionResult<PagedResult<UserResponse>>> GetAll(
+        [FromQuery] QueryParameters query,
+        [FromQuery] string? role,
+        CancellationToken cancellationToken)
     {
-        var users = await dbContext.Users.AsNoTracking()
-            .OrderBy(user => user.Id)
+        var q = dbContext.Users.AsNoTracking().AsQueryable();
+        if (query.NormalizedKeyword is { } term)
+        {
+            q = q.Where(u =>
+                u.FullName.ToLower().Contains(term) ||
+                u.Email.ToLower().Contains(term) ||
+                (u.Phone != null && u.Phone.Contains(term)));
+        }
+        if (!string.IsNullOrWhiteSpace(role) && Enum.TryParse<UserRole>(role, true, out var roleFilter))
+            q = q.Where(u => u.Role == roleFilter);
+
+        var sortKey = (query.SortBy ?? "fullname").ToLowerInvariant();
+        var desc = query.IsDescending;
+        q = sortKey switch
+        {
+            "email" => desc ? q.OrderByDescending(u => u.Email) : q.OrderBy(u => u.Email),
+            "role" => desc ? q.OrderByDescending(u => u.Role).ThenBy(u => u.FullName) : q.OrderBy(u => u.Role).ThenBy(u => u.FullName),
+            "created" or "createdat" => desc ? q.OrderByDescending(u => u.CreatedAt) : q.OrderBy(u => u.CreatedAt),
+            "id" => desc ? q.OrderByDescending(u => u.Id) : q.OrderBy(u => u.Id),
+            _ => desc ? q.OrderByDescending(u => u.FullName) : q.OrderBy(u => u.FullName)
+        };
+
+        var total = await q.CountAsync(cancellationToken);
+        var items = await q.Skip(query.Skip).Take(query.Take)
             .Select(user => new UserResponse(
                 user.Id, user.FullName, user.Email, user.Phone, user.Role, user.IsActive, user.CreatedAt))
             .ToListAsync(cancellationToken);
-        return Ok(users);
+        return Ok(PagedResult<UserResponse>.Create(items, query.PageNumber, query.Take, total));
     }
 
     [Authorize(Roles = nameof(UserRole.Admin))]
@@ -248,7 +274,25 @@ public sealed class UsersController(AppDbContext dbContext) : ControllerBase
     private static bool IsUniqueConstraintViolation(DbUpdateException exception) =>
         exception.InnerException is SqlException { Number: 2601 or 2627 };
 
-    private static UserResponse ToResponse(User user) => new(
+    [HttpPost("me/change-password")]
+    public async Task<IActionResult> ChangePassword(
+        [FromBody] ChangePasswordRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!User.TryGetUserId(out var userId)) return Unauthorized();
+        if (string.IsNullOrWhiteSpace(request.NewPassword) || request.NewPassword.Length < 6)
+            return BadRequest(new ProblemDetails { Title = "New password must be at least 6 characters." });
+
+        var user = await dbContext.Users.SingleAsync(u => u.Id == userId, cancellationToken);
+        if (!PasswordHashing.Verify(request.CurrentPassword, user.PasswordHash))
+            return BadRequest(new ProblemDetails { Title = "Current password is incorrect." });
+
+        user.PasswordHash = PasswordHashing.Hash(request.NewPassword);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return NoContent();
+    }
+
+private static UserResponse ToResponse(User user) => new(
         user.Id,
         user.FullName,
         user.Email,

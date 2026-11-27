@@ -18,6 +18,8 @@ public sealed class ProductRequest
 
     [Range(1, 600)]
     public int WarrantyMonths { get; init; }
+
+    public int? CategoryId { get; init; }
 }
 
 public sealed record ProductResponse(
@@ -27,4 +29,6 @@ public sealed record ProductResponse(
     string Model,
     string SerialNumber,
     int WarrantyMonths,
+    int? CategoryId,
+    string? CategoryName,
     DateTime CreatedAt);

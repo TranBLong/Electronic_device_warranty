@@ -12,6 +12,7 @@ public static partial class DatabaseSeeder
         if (await dbContext.Users.AnyAsync())
         {
             await SeedExtendedAsync(dbContext);
+            await SeedBulkDemoAsync(dbContext);
             return;
         }
 
@@ -322,6 +323,7 @@ public static partial class DatabaseSeeder
         await dbContext.SaveChangesAsync();
 
         await SeedExtendedAsync(dbContext);
+        await SeedBulkDemoAsync(dbContext);
     }
 
     private static string GenerateRefreshTokenHash() =>

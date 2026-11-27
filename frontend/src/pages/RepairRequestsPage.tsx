@@ -1,9 +1,12 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { api, getErrorMessage } from '../api/client';
 import { useAuthStore } from '../store/authStore';
-import type { RepairRequest, WarrantyCard, User, RepairRequestStatus } from '../types';
-import { Plus } from 'lucide-react';
+import type { RepairRequest, WarrantyCard, User, RepairRequestStatus, RepairPartLine, Part } from '../types';
+import { Plus, Pencil, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
+import { Button, Alert, PageHeader, EmptyState, Select, TextArea } from '../components/ui';
+import { useSort } from '../hooks/useSort';
+import { SortHeader } from '../components/SortHeader';
 
 function mapReq(d: any): RepairRequest {
   return {
@@ -29,20 +32,21 @@ function mapReq(d: any): RepairRequest {
 }
 
 const statusColor: Record<string, string> = {
-  Received: 'bg-amber-100 text-amber-800',
-  InProgress: 'bg-blue-100 text-blue-800',
-  Completed: 'bg-emerald-100 text-emerald-800',
-  Returned: 'bg-slate-100 text-slate-700',
-  Cancelled: 'bg-red-100 text-red-800',
+  Received: 'badge-warning',
+  InProgress: 'badge-info',
+  Completed: 'badge-success',
+  Returned: 'badge-neutral',
+  Cancelled: 'badge-danger',
 };
 
 const statuses: RepairRequestStatus[] = ['Received', 'InProgress', 'Completed', 'Returned', 'Cancelled'];
 
 export default function RepairRequestsPage() {
   const { hasRole, user } = useAuthStore();
-  const canCreate = hasRole('Admin', 'Receptionist', 'Customer');
+  const canCreate = hasRole('Admin', 'Manager', 'Receptionist', 'Customer');
   const canAssign = hasRole('Admin', 'Manager', 'Receptionist');
-  const canUpdateStatus = hasRole('Technician');
+  const canEdit = hasRole('Admin', 'Manager', 'Receptionist');
+  const canStatus = hasRole('Technician', 'Admin', 'Manager');
   const [items, setItems] = useState<RepairRequest[]>([]);
   const [cards, setCards] = useState<WarrantyCard[]>([]);
   const [technicians, setTechnicians] = useState<User[]>([]);
@@ -51,6 +55,12 @@ export default function RepairRequestsPage() {
   const [form, setForm] = useState({ warrantyCardId: 0, description: '' });
   const [assignId, setAssignId] = useState<number | null>(null);
   const [techId, setTechId] = useState(0);
+  const [editId, setEditId] = useState<number | null>(null);
+  const [editDesc, setEditDesc] = useState('');
+  const [partsFor, setPartsFor] = useState<number | null>(null);
+  const [partLines, setPartLines] = useState<RepairPartLine[]>([]);
+  const [allParts, setAllParts] = useState<Part[]>([]);
+  const [partForm, setPartForm] = useState({ partId: 0, quantity: 1 });
 
   const load = async () => {
     try {
@@ -90,9 +100,9 @@ export default function RepairRequestsPage() {
     }
   };
 
-  useEffect(() => {
-    load();
-  }, []);
+  useEffect(() => { load(); }, []);
+
+  const { sorted, sortKey, sortDir, toggle } = useSort(items, 'createdAt', 'desc');
 
   const onCreate = async (e: FormEvent) => {
     e.preventDefault();
@@ -130,39 +140,117 @@ export default function RepairRequestsPage() {
     }
   };
 
+  const onSaveEdit = async () => {
+    if (!editId) return;
+    setError('');
+    try {
+      await api.put(`/api/repair-requests/${editId}`, { description: editDesc });
+      setEditId(null);
+      await load();
+    } catch (err) {
+      setError(getErrorMessage(err));
+    }
+  };
+
+  const onCancel = async (id: number) => {
+    if (!confirm('Hủy yêu cầu sửa chữa này?')) return;
+    setError('');
+    try {
+      await api.delete(`/api/repair-requests/${id}`);
+      await load();
+    } catch (err) {
+      setError(getErrorMessage(err));
+    }
+  };
+
+
+  const openParts = async (id: number) => {
+    setPartsFor(id);
+    setError('');
+    try {
+      const [lines, parts] = await Promise.all([
+        api.get(`/api/repair-requests/${id}/parts`),
+        api.get('/api/parts'),
+      ]);
+      setPartLines((Array.isArray(lines.data) ? lines.data : []).map((d: any) => ({
+        id: d.id ?? d.Id,
+        partId: d.partId ?? d.PartId,
+        partCode: d.partCode ?? d.PartCode,
+        partName: d.partName ?? d.PartName,
+        quantity: d.quantity ?? d.Quantity,
+        unitPrice: d.unitPrice ?? d.UnitPrice,
+        lineTotal: d.lineTotal ?? d.LineTotal,
+        addedAt: d.addedAt ?? d.AddedAt,
+      })));
+      setAllParts((Array.isArray(parts.data) ? parts.data : []).map((d: any) => ({
+        id: d.id ?? d.Id,
+        code: d.code ?? d.Code,
+        name: d.name ?? d.Name,
+        unitPrice: d.unitPrice ?? d.UnitPrice,
+        stockQuantity: d.stockQuantity ?? d.StockQuantity,
+        isActive: d.isActive ?? d.IsActive,
+        createdAt: d.createdAt ?? d.CreatedAt,
+      })));
+    } catch (err) {
+      setError(getErrorMessage(err));
+    }
+  };
+
+  const addPartLine = async () => {
+    if (!partsFor || !partForm.partId) return;
+    try {
+      await api.post(`/api/repair-requests/${partsFor}/parts`, partForm);
+      await openParts(partsFor);
+      setPartForm({ partId: 0, quantity: 1 });
+    } catch (err) {
+      setError(getErrorMessage(err));
+    }
+  };
+
+  const removePartLine = async (lineId: number) => {
+    if (!partsFor) return;
+    try {
+      await api.delete(`/api/repair-requests/${partsFor}/parts/${lineId}`);
+      await openParts(partsFor);
+    } catch (err) {
+      setError(getErrorMessage(err));
+    }
+  };
+
+  const canChangeStatus = (r: RepairRequest) => {
+    if (hasRole('Admin', 'Manager')) return true;
+    if (hasRole('Technician') && Number(r.technicianId) === Number(user?.id)) return true;
+    return false;
+  };
+
   return (
     <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <h2 className="text-xl font-bold text-slate-800">Yêu cầu sửa chữa</h2>
-        {canCreate && (
-          <button className="btn-primary" onClick={() => setShowForm(!showForm)}>
-            <Plus size={16} /> Tạo yêu cầu
-          </button>
-        )}
-      </div>
+      <PageHeader
+        title="Yêu cầu sửa chữa"
+        subtitle="Theo dõi và cập nhật tiến độ sửa chữa"
+        actions={canCreate ? <Button icon={<Plus size={16} />} onClick={() => setShowForm(!showForm)}>Tạo yêu cầu</Button> : undefined}
+      />
 
-      {error && <div className="rounded-lg bg-red-50 text-red-700 text-sm px-3 py-2">{error}</div>}
+      {error && <Alert type="error">{error}</Alert>}
 
       {showForm && (
         <form onSubmit={onCreate} className="card p-4 space-y-3">
-          <div>
-            <label className="label">Phiếu bảo hành</label>
-            <select className="input" value={form.warrantyCardId} onChange={(e) => setForm({ ...form, warrantyCardId: +e.target.value })} required>
-              <option value={0}>-- Chọn --</option>
-              {cards.filter((c) => c.status === 'Active').map((c) => (
-                <option key={c.id} value={c.id}>
-                  #{c.id} — {c.productName || `SP #${c.productId}`}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="label">Mô tả sự cố</label>
-            <textarea className="input min-h-[80px]" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} required />
-          </div>
+          <Select
+            label="Phiếu bảo hành"
+            value={form.warrantyCardId}
+            onChange={(e) => setForm({ ...form, warrantyCardId: +e.target.value })}
+            placeholder="-- Chọn --"
+            options={cards.filter((c) => c.status === 'Active').map((c) => ({
+              value: c.id,
+              label: `#${c.id} — ${c.productName || `SP #${c.productId}`}`,
+            }))}
+            required
+          />
+          <TextArea label="Mô tả sự cố" value={form.description}
+            onChange={(e) => setForm({ ...form, description: e.target.value })} required />
           <div className="flex gap-2">
-            <button type="submit" className="btn-primary">Gửi</button>
-            <button type="button" className="btn-secondary" onClick={() => setShowForm(false)}>Hủy</button>
+            <Button type="submit">Gửi</Button>
+            <Button type="button" variant="secondary" onClick={() => setShowForm(false)}>Hủy</Button>
           </div>
         </form>
       )}
@@ -170,69 +258,128 @@ export default function RepairRequestsPage() {
       {assignId && (
         <div className="card p-4 flex flex-wrap items-end gap-3">
           <div className="flex-1 min-w-[200px]">
-            <label className="label">Gán kỹ thuật viên cho #{assignId}</label>
-            <select className="input" value={techId} onChange={(e) => setTechId(+e.target.value)}>
-              <option value={0}>-- Chọn --</option>
-              {technicians.map((t) => (
-                <option key={t.id} value={t.id}>{t.fullName}</option>
-              ))}
-            </select>
+            <Select
+              label={`Gán kỹ thuật viên cho #${assignId}`}
+              value={techId}
+              onChange={(e) => setTechId(+e.target.value)}
+              placeholder="-- Chọn --"
+              options={technicians.map((t) => ({ value: t.id, label: t.fullName }))}
+            />
           </div>
-          <button className="btn-primary" onClick={onAssign}>Gán</button>
-          <button className="btn-secondary" onClick={() => setAssignId(null)}>Hủy</button>
+          <Button onClick={onAssign}>Gán</Button>
+          <Button variant="secondary" onClick={() => setAssignId(null)}>Hủy</Button>
         </div>
       )}
 
-      <div className="space-y-3">
-        {items.map((r) => (
-          <div key={r.id} className="card p-4">
-            <div className="flex flex-wrap items-start justify-between gap-2">
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="font-semibold text-slate-800">#{r.id}</span>
-                  <span className={`badge ${statusColor[r.status] || ''}`}>{r.status}</span>
-                </div>
-                <p className="text-sm text-slate-600 mt-1">{r.description}</p>
-                <p className="text-xs text-slate-400 mt-2">
-                  KH: {r.customerName || `#${r.customerId}`} · Phiếu BH: #{r.warrantyCardId}
-                  {r.technicianName && ` · KT: ${r.technicianName}`}
-                  {' · '}
-                  {r.createdAt ? format(new Date(r.createdAt), 'dd/MM/yyyy HH:mm') : ''}
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {canAssign && !r.technicianId && r.status === 'Received' && (
-                  <button className="btn-secondary text-xs" onClick={() => setAssignId(r.id)}>Gán KT</button>
-                )}
-                {canUpdateStatus && r.technicianId === user?.id && (
-                  <select
-                    className="input text-xs py-1 w-auto"
-                    value={r.status}
-                    onChange={(e) => onStatus(r.id, e.target.value as RepairRequestStatus)}
-                  >
-                    {statuses.map((s) => (
-                      <option key={s} value={s}>{s}</option>
-                    ))}
-                  </select>
-                )}
-              </div>
-            </div>
-            {r.statusHistory?.length > 0 && (
-              <div className="mt-3 pt-3 border-t border-slate-100">
-                <p className="text-xs font-medium text-slate-500 mb-1">Lịch sử trạng thái</p>
-                <ul className="text-xs text-slate-500 space-y-0.5">
-                  {r.statusHistory.map((h) => (
-                    <li key={h.id}>
-                      {h.oldStatus || '—'} → <strong>{h.newStatus}</strong> · {h.changedAt ? format(new Date(h.changedAt), 'dd/MM/yyyy HH:mm') : ''}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
+      {editId && (
+        <div className="card p-4 space-y-3">
+          <TextArea label={`Sửa mô tả #${editId}`} value={editDesc} onChange={(e) => setEditDesc(e.target.value)} />
+          <div className="flex gap-2">
+            <Button onClick={onSaveEdit}>Lưu</Button>
+            <Button variant="secondary" onClick={() => setEditId(null)}>Hủy</Button>
           </div>
-        ))}
-        {items.length === 0 && <div className="card p-8 text-center text-slate-400">Không có yêu cầu nào</div>}
+        </div>
+      )}
+
+      <div className="card overflow-x-auto">
+        <table className="data-table">
+          <thead>
+            <tr>
+              <SortHeader label="ID" column="id" sortKey={sortKey} sortDir={sortDir} onToggle={toggle} />
+              <SortHeader label="Khách hàng" column="customerName" sortKey={sortKey} sortDir={sortDir} onToggle={toggle} />
+              <SortHeader label="Mô tả" column="description" sortKey={sortKey} sortDir={sortDir} onToggle={toggle} />
+              <SortHeader label="Trạng thái" column="status" sortKey={sortKey} sortDir={sortDir} onToggle={toggle} />
+              <SortHeader label="Kỹ thuật viên" column="technicianName" sortKey={sortKey} sortDir={sortDir} onToggle={toggle} />
+              <SortHeader label="Ngày tạo" column="createdAt" sortKey={sortKey} sortDir={sortDir} onToggle={toggle} />
+              <th className="px-4 py-3 text-right text-xs font-semibold uppercase">Thao tác</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sorted.map((r) => (
+              <tr key={r.id}>
+                <td className="font-medium">#{r.id}</td>
+                <td>{r.customerName || `#${r.customerId}`}</td>
+                <td className="max-w-xs truncate" title={r.description}>{r.description}</td>
+                <td><span className={statusColor[r.status] || 'badge-neutral'}>{r.status}</span></td>
+                <td>{r.technicianName || <span className="text-slate-400">Chưa gán</span>}</td>
+                <td className="text-xs text-slate-500">{r.createdAt ? format(new Date(r.createdAt), 'dd/MM/yyyy HH:mm') : ''}</td>
+                <td className="text-right">
+                  <div className="inline-flex flex-wrap gap-1 justify-end">
+                    {canAssign && !r.technicianId && r.status === 'Received' && (
+                      <Button size="sm" variant="secondary" onClick={() => setAssignId(r.id)}>Gán KT</Button>
+                    )}
+                    {canChangeStatus(r) && (
+                      <select
+                        className="input text-xs py-1 w-auto"
+                        value={r.status}
+                        onChange={(e) => onStatus(r.id, e.target.value as RepairRequestStatus)}
+                      >
+                        {statuses.map((s) => (
+                          <option key={s} value={s}>{s}</option>
+                        ))}
+                      </select>
+                    )}
+                    <Button size="sm" variant="ghost" onClick={() => openParts(r.id)}>Linh kiện</Button>
+                    {canEdit && (
+                      <>
+                        <button className="btn-ghost btn-sm" onClick={() => { setEditId(r.id); setEditDesc(r.description); }} title="Sửa">
+                          <Pencil size={14} />
+                        </button>
+                        <button className="btn-ghost btn-sm text-red-600" onClick={() => onCancel(r.id)} title="Hủy">
+                          <Trash2 size={14} />
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {sorted.length === 0 && <EmptyState title="Không có yêu cầu" description="Chưa có yêu cầu sửa chữa nào." />}
       </div>
+
+      {partsFor && (
+        <div className="card p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="font-semibold">Linh kiện — yêu cầu #{partsFor}</h3>
+            <Button variant="secondary" size="sm" onClick={() => setPartsFor(null)}>Đóng</Button>
+          </div>
+          <ul className="text-sm space-y-1">
+            {partLines.map((l) => (
+              <li key={l.id} className="flex justify-between gap-2 border-b border-slate-100 py-1">
+                <span>{l.partCode} — {l.partName} × {l.quantity}</span>
+                <span className="flex items-center gap-2">
+                  {Number(l.lineTotal).toLocaleString('vi-VN')} ₫
+                  {canStatus && (
+                    <button className="text-red-600 text-xs" onClick={() => removePartLine(l.id)}>Xóa</button>
+                  )}
+                </span>
+              </li>
+            ))}
+            {partLines.length === 0 && <li className="text-slate-400">Chưa dùng linh kiện</li>}
+          </ul>
+          {canStatus && (
+            <div className="flex flex-wrap gap-2 items-end">
+              <div className="flex-1 min-w-[180px]">
+                <label className="label">Linh kiện</label>
+                <select className="input" value={partForm.partId} onChange={(e) => setPartForm({ ...partForm, partId: +e.target.value })}>
+                  <option value={0}>-- Chọn --</option>
+                  {allParts.map((p) => (
+                    <option key={p.id} value={p.id}>{p.code} — {p.name} (tồn {p.stockQuantity})</option>
+                  ))}
+                </select>
+              </div>
+              <div className="w-24">
+                <label className="label">SL</label>
+                <input className="input" type="number" min={1} value={partForm.quantity}
+                  onChange={(e) => setPartForm({ ...partForm, quantity: +e.target.value })} />
+              </div>
+              <Button onClick={addPartLine}>Thêm</Button>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

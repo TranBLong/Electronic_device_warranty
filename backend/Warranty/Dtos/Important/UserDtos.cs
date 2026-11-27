@@ -63,3 +63,13 @@ public sealed record UserResponse(
     UserRole Role,
     bool IsActive,
     DateTime CreatedAt);
+
+
+public sealed class ChangePasswordRequest
+{
+    [System.ComponentModel.DataAnnotations.Required]
+    public string CurrentPassword { get; init; } = string.Empty;
+
+    [System.ComponentModel.DataAnnotations.Required, System.ComponentModel.DataAnnotations.MinLength(6)]
+    public string NewPassword { get; init; } = string.Empty;
+}

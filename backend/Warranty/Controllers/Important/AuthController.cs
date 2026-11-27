@@ -20,7 +20,7 @@ public sealed class AuthController(
     AppDbContext dbContext,
     TokenService tokenService) : ControllerBase
 {
-    private static readonly TimeSpan RefreshTokenLifetime = TimeSpan.FromDays(7);
+    // refresh lifetime from JwtOptions via TokenService
 
     [AllowAnonymous]
     [HttpPost("register")]
@@ -138,7 +138,7 @@ public sealed class AuthController(
             accessToken.Token,
             accessToken.ExpiresAt,
             rawRefreshToken,
-            DateTime.UtcNow.Add(RefreshTokenLifetime));
+            DateTime.UtcNow.AddDays(tokenService.RefreshTokenDays));
     }
 
     private static string NormalizeEmail(string email) => email.Trim().ToLowerInvariant();

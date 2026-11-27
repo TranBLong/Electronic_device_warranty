@@ -2,9 +2,11 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using Warranty.Constants;
 using Warranty.Data;
 using Warranty.Dtos;
 using Warranty.Enums;
+// QueryParameters in Dtos
 using Warranty.Models;
 
 namespace Warranty.Controllers;
@@ -15,33 +17,59 @@ namespace Warranty.Controllers;
 public sealed class ProductsController(AppDbContext dbContext) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<IReadOnlyList<ProductResponse>>> GetAll(CancellationToken cancellationToken)
+    public async Task<ActionResult<PagedResult<ProductResponse>>> GetAll(
+        [FromQuery] QueryParameters query,
+        CancellationToken cancellationToken)
     {
-        var products = await dbContext.Products.AsNoTracking()
-            .OrderBy(product => product.Name)
-            .Select(product => ToResponse(product))
-            .ToListAsync(cancellationToken);
-        return Ok(products);
+        var q = dbContext.Products.AsNoTracking().Include(product => product.Category).AsQueryable();
+        if (query.NormalizedKeyword is { } term)
+        {
+            q = q.Where(p =>
+                p.Name.ToLower().Contains(term) ||
+                p.Brand.ToLower().Contains(term) ||
+                p.Model.ToLower().Contains(term) ||
+                p.SerialNumber.ToLower().Contains(term));
+        }
+        var sortKey = (query.SortBy ?? "name").ToLowerInvariant();
+        var desc = query.IsDescending;
+        q = sortKey switch
+        {
+            "brand" => desc ? q.OrderByDescending(p => p.Brand) : q.OrderBy(p => p.Brand),
+            "model" => desc ? q.OrderByDescending(p => p.Model) : q.OrderBy(p => p.Model),
+            "serial" or "serialnumber" => desc ? q.OrderByDescending(p => p.SerialNumber) : q.OrderBy(p => p.SerialNumber),
+            "warranty" or "warrantymonths" => desc ? q.OrderByDescending(p => p.WarrantyMonths) : q.OrderBy(p => p.WarrantyMonths),
+            "created" or "createdat" => desc ? q.OrderByDescending(p => p.CreatedAt) : q.OrderBy(p => p.CreatedAt),
+            _ => desc ? q.OrderByDescending(p => p.Name) : q.OrderBy(p => p.Name)
+        };
+        var total = await q.CountAsync(cancellationToken);
+        var list = await q.Skip(query.Skip).Take(query.Take).ToListAsync(cancellationToken);
+        return Ok(PagedResult<ProductResponse>.Create(list.Select(ToResponse).ToList(), query.PageNumber, query.Take, total));
     }
 
     [HttpGet("{id:int}")]
     public async Task<ActionResult<ProductResponse>> GetById(int id, CancellationToken cancellationToken)
     {
         var product = await dbContext.Products.AsNoTracking()
+            .Include(candidate => candidate.Category)
             .SingleOrDefaultAsync(candidate => candidate.Id == id, cancellationToken);
         return product is null ? NotFound() : Ok(ToResponse(product));
     }
 
-    [Authorize(Roles = nameof(UserRole.Admin))]
+    [Authorize(Policy = Policies.CanManageCatalog)]
     [HttpPost]
-    public async Task<ActionResult<ProductResponse>> Create(
-        ProductRequest request,
-        CancellationToken cancellationToken)
+    public async Task<ActionResult<ProductResponse>> Create(ProductRequest request, CancellationToken cancellationToken)
     {
         var serialNumber = NormalizeSerialNumber(request.SerialNumber);
         if (await dbContext.Products.AnyAsync(product => product.SerialNumber == serialNumber, cancellationToken))
         {
             return Conflict(new ProblemDetails { Title = "Serial number is already registered." });
+        }
+
+        if (request.CategoryId is int catId)
+        {
+            var catExists = await dbContext.Categories.AnyAsync(c => c.Id == catId && c.IsActive, cancellationToken);
+            if (!catExists)
+                return BadRequest(new ProblemDetails { Title = "Category was not found or inactive." });
         }
 
         var product = new Product
@@ -50,7 +78,8 @@ public sealed class ProductsController(AppDbContext dbContext) : ControllerBase
             Brand = request.Brand.Trim(),
             Model = request.Model.Trim(),
             SerialNumber = serialNumber,
-            WarrantyMonths = request.WarrantyMonths
+            WarrantyMonths = request.WarrantyMonths,
+            CategoryId = request.CategoryId
         };
         dbContext.Products.Add(product);
         try
@@ -65,25 +94,25 @@ public sealed class ProductsController(AppDbContext dbContext) : ControllerBase
         return CreatedAtAction(nameof(GetById), new { id = product.Id }, ToResponse(product));
     }
 
-    [Authorize(Roles = nameof(UserRole.Admin))]
+    [Authorize(Policy = Policies.CanManageCatalog)]
     [HttpPut("{id:int}")]
-    public async Task<ActionResult<ProductResponse>> Update(
-        int id,
-        ProductRequest request,
-        CancellationToken cancellationToken)
+    public async Task<ActionResult<ProductResponse>> Update(int id, ProductRequest request, CancellationToken cancellationToken)
     {
         var product = await dbContext.Products.SingleOrDefaultAsync(candidate => candidate.Id == id, cancellationToken);
-        if (product is null)
-        {
-            return NotFound();
-        }
+        if (product is null) return NotFound();
 
         var serialNumber = NormalizeSerialNumber(request.SerialNumber);
         if (await dbContext.Products.AnyAsync(
-                candidate => candidate.Id != id && candidate.SerialNumber == serialNumber,
-                cancellationToken))
+                candidate => candidate.Id != id && candidate.SerialNumber == serialNumber, cancellationToken))
         {
             return Conflict(new ProblemDetails { Title = "Serial number is already registered." });
+        }
+
+        if (request.CategoryId is int catIdUpd)
+        {
+            var catExists = await dbContext.Categories.AnyAsync(c => c.Id == catIdUpd && c.IsActive, cancellationToken);
+            if (!catExists)
+                return BadRequest(new ProblemDetails { Title = "Category was not found or inactive." });
         }
 
         product.Name = request.Name.Trim();
@@ -91,6 +120,7 @@ public sealed class ProductsController(AppDbContext dbContext) : ControllerBase
         product.Model = request.Model.Trim();
         product.SerialNumber = serialNumber;
         product.WarrantyMonths = request.WarrantyMonths;
+        product.CategoryId = request.CategoryId;
         try
         {
             await dbContext.SaveChangesAsync(cancellationToken);
@@ -103,15 +133,12 @@ public sealed class ProductsController(AppDbContext dbContext) : ControllerBase
         return Ok(ToResponse(product));
     }
 
-    [Authorize(Roles = nameof(UserRole.Admin))]
+    [Authorize(Policy = Policies.CanManageCatalog)]
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> Delete(int id, CancellationToken cancellationToken)
     {
         var product = await dbContext.Products.SingleOrDefaultAsync(candidate => candidate.Id == id, cancellationToken);
-        if (product is null)
-        {
-            return NotFound();
-        }
+        if (product is null) return NotFound();
 
         if (await dbContext.WarrantyCards.AnyAsync(card => card.ProductId == id, cancellationToken))
         {
@@ -135,5 +162,7 @@ public sealed class ProductsController(AppDbContext dbContext) : ControllerBase
         product.Model,
         product.SerialNumber,
         product.WarrantyMonths,
+        product.CategoryId,
+        product.Category?.Name,
         product.CreatedAt);
 }

@@ -10,6 +10,7 @@ import RepairRequestsPage from './pages/RepairRequestsPage';
 import UsersPage from './pages/UsersPage';
 import PartsPage from './pages/PartsPage';
 import CategoriesPage from './pages/CategoriesPage';
+import ServiceCentersPage from './pages/ServiceCentersPage';
 import ProfilePage from './pages/ProfilePage';
 import type { UserRole } from './types';
 
@@ -40,7 +41,7 @@ export default function App() {
         <Route
           path="users"
           element={
-            <ProtectedRoute roles={['Admin']}>
+            <ProtectedRoute roles={['Admin', 'Manager']}>
               <UsersPage />
             </ProtectedRoute>
           }
@@ -56,8 +57,16 @@ export default function App() {
         <Route
           path="categories"
           element={
-            <ProtectedRoute roles={['Admin']}>
+            <ProtectedRoute roles={['Admin', 'Manager']}>
               <CategoriesPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="service-centers"
+          element={
+            <ProtectedRoute roles={['Admin', 'Manager', 'Receptionist']}>
+              <ServiceCentersPage />
             </ProtectedRoute>
           }
         />

@@ -28,6 +28,18 @@ export interface Product {
   warrantyMonths: number;
   createdAt: string;
   categoryId?: number | null;
+  categoryName?: string | null;
+}
+
+export interface RepairPartLine {
+  id: number;
+  partId: number;
+  partCode: string;
+  partName: string;
+  quantity: number;
+  unitPrice: number;
+  lineTotal: number;
+  addedAt: string;
 }
 
 export interface WarrantyCard {

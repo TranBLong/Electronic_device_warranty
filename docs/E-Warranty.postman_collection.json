@@ -1,0 +1,110 @@
+{
+  "info": {
+    "name": "E-Warranty API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Collection demo Buổi 15 – Happy path + phân quyền"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "https://localhost:7xxx" },
+    { "key": "accessToken", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Login Admin",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@warranty.local\",\n  \"password\": \"Admin@123\"\n}"
+            },
+            "url": "{{baseUrl}}/api/auth/login"
+          }
+        },
+        {
+          "name": "Login Customer (forbid admin APIs)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"customer01@warranty.local\",\n  \"password\": \"Customer@123\"\n}"
+            },
+            "url": "{{baseUrl}}/api/auth/login"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Products paged",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+        "url": "{{baseUrl}}/api/products?pageNumber=1&pageSize=20&keyword=dell&sortBy=name&isDescending=false"
+      }
+    },
+    {
+      "name": "Users paged (~1000)",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+        "url": "{{baseUrl}}/api/users?pageNumber=1&pageSize=20&keyword=customer&role=Customer"
+      }
+    },
+    {
+      "name": "Warranty by serial",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/warranty-cards/by-serial/SNXXX"
+      }
+    },
+    {
+      "name": "Create Invoice",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"repairRequestId\": 1,\n  \"partsTotal\": 500000,\n  \"laborTotal\": 200000\n}"
+        },
+        "url": "{{baseUrl}}/api/invoices"
+      }
+    },
+    {
+      "name": "Record Payment",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"invoiceId\": 1,\n  \"amount\": 700000,\n  \"method\": \"Cash\",\n  \"note\": \"Thanh toan du\"\n}"
+        },
+        "url": "{{baseUrl}}/api/payments"
+      }
+    },
+    {
+      "name": "My Notifications",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+        "url": "{{baseUrl}}/api/notifications?pageNumber=1&pageSize=10"
+      }
+    },
+    {
+      "name": "Health",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/health"
+      }
+    }
+  ]
+}

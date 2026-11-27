@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Warranty.Constants;
 using Warranty.Data;
 using Warranty.Dtos;
 using Warranty.Enums;
@@ -14,21 +15,20 @@ namespace Warranty.Controllers;
 public sealed class CategoriesController(AppDbContext dbContext) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<IReadOnlyList<CategoryResponse>>> GetAll(
-        [FromQuery] string? search,
+    public async Task<ActionResult<PagedResult<CategoryResponse>>> GetAll(
+        [FromQuery] QueryParameters query,
         CancellationToken cancellationToken)
     {
-        var query = dbContext.Categories.AsNoTracking().Where(c => c.IsActive);
-        if (!string.IsNullOrWhiteSpace(search))
-        {
-            var term = search.Trim().ToLower();
-            query = query.Where(c => c.Name.ToLower().Contains(term));
-        }
-
-        var items = await query.OrderBy(c => c.Name)
+        var q = dbContext.Categories.AsNoTracking().Where(c => c.IsActive).AsQueryable();
+        if (query.NormalizedKeyword is { } term)
+            q = q.Where(c => c.Name.ToLower().Contains(term) ||
+                             (c.Description != null && c.Description.ToLower().Contains(term)));
+        q = query.IsDescending ? q.OrderByDescending(c => c.Name) : q.OrderBy(c => c.Name);
+        var total = await q.CountAsync(cancellationToken);
+        var items = await q.Skip(query.Skip).Take(query.Take)
             .Select(c => new CategoryResponse(c.Id, c.Name, c.Description, c.IsActive, c.CreatedAt))
             .ToListAsync(cancellationToken);
-        return Ok(items);
+        return Ok(PagedResult<CategoryResponse>.Create(items, query.PageNumber, query.Take, total));
     }
 
     [HttpGet("{id:int}")]
@@ -41,7 +41,7 @@ public sealed class CategoriesController(AppDbContext dbContext) : ControllerBas
     }
 
     [HttpPost]
-    [Authorize(Roles = nameof(UserRole.Admin))]
+    [Authorize(Policy = Policies.CanManageCatalog)]
     public async Task<ActionResult<CategoryResponse>> Create(
         [FromBody] CategoryRequest request,
         CancellationToken cancellationToken)
@@ -59,7 +59,7 @@ public sealed class CategoriesController(AppDbContext dbContext) : ControllerBas
     }
 
     [HttpPut("{id:int}")]
-    [Authorize(Roles = nameof(UserRole.Admin))]
+    [Authorize(Policy = Policies.CanManageCatalog)]
     public async Task<ActionResult<CategoryResponse>> Update(
         int id,
         [FromBody] CategoryRequest request,
@@ -74,7 +74,7 @@ public sealed class CategoriesController(AppDbContext dbContext) : ControllerBas
     }
 
     [HttpDelete("{id:int}")]
-    [Authorize(Roles = nameof(UserRole.Admin))]
+    [Authorize(Policy = Policies.CanManageCatalog)]
     public async Task<IActionResult> Deactivate(int id, CancellationToken cancellationToken)
     {
         var category = await dbContext.Categories.SingleOrDefaultAsync(c => c.Id == id, cancellationToken);

@@ -46,7 +46,7 @@ public sealed class PartsController(AppDbContext dbContext) : ControllerBase
     }
 
     [HttpPost]
-    [Authorize(Roles = nameof(UserRole.Admin))]
+    [Authorize(Roles = "Admin,Manager")]
     public async Task<ActionResult<PartResponse>> Create([FromBody] PartRequest request, CancellationToken cancellationToken)
     {
         if (await dbContext.Parts.AnyAsync(p => p.Code == request.Code.Trim(), cancellationToken))
@@ -92,7 +92,7 @@ public sealed class PartsController(AppDbContext dbContext) : ControllerBase
     }
 
     [HttpDelete("{id:int}")]
-    [Authorize(Roles = nameof(UserRole.Admin))]
+    [Authorize(Roles = "Admin,Manager")]
     public async Task<IActionResult> Deactivate(int id, CancellationToken cancellationToken)
     {
         var part = await dbContext.Parts.SingleOrDefaultAsync(p => p.Id == id, cancellationToken);

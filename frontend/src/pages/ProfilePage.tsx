@@ -1,6 +1,7 @@
 import { FormEvent, useState } from 'react';
 import { api, getErrorMessage } from '../api/client';
 import { useAuthStore } from '../store/authStore';
+import { UserCircle, Lock, Shield } from 'lucide-react';
 
 export default function ProfilePage() {
   const { user, fetchMe } = useAuthStore();
@@ -9,9 +10,11 @@ export default function ProfilePage() {
     email: user?.email || '',
     phone: user?.phone || '',
   });
+  const [pwd, setPwd] = useState({ currentPassword: '', newPassword: '', confirm: '' });
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [pwdLoading, setPwdLoading] = useState(false);
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -29,32 +32,148 @@ export default function ProfilePage() {
     }
   };
 
+  const onChangePassword = async (e: FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setMessage('');
+    if (pwd.newPassword !== pwd.confirm) {
+      setError('Mật khẩu mới và xác nhận không khớp.');
+      return;
+    }
+    if (pwd.newPassword.length < 6) {
+      setError('Mật khẩu mới tối thiểu 6 ký tự.');
+      return;
+    }
+    setPwdLoading(true);
+    try {
+      await api.post('/api/users/me/change-password', {
+        currentPassword: pwd.currentPassword,
+        newPassword: pwd.newPassword,
+      });
+      setPwd({ currentPassword: '', newPassword: '', confirm: '' });
+      setMessage('Đổi mật khẩu thành công.');
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setPwdLoading(false);
+    }
+  };
+
   return (
-    <div className="max-w-lg space-y-4">
-      <h2 className="text-xl font-bold text-slate-800">Hồ sơ cá nhân</h2>
+    <div className="space-y-6 max-w-2xl">
+      <div className="rounded-2xl bg-gradient-to-r from-indigo-600 via-violet-600 to-purple-600 p-6 text-white shadow-lg">
+        <div className="flex items-center gap-4">
+          <div className="rounded-full bg-white/20 p-4">
+            <UserCircle size={40} />
+          </div>
+          <div>
+            <h2 className="text-2xl font-bold">{user?.fullName || 'Hồ sơ'}</h2>
+            <p className="text-indigo-100 text-sm mt-0.5">
+              {user?.email} · <span className="font-medium">{user?.role}</span>
+            </p>
+          </div>
+        </div>
+      </div>
 
-      {message && <div className="rounded-lg bg-emerald-50 text-emerald-700 text-sm px-3 py-2">{message}</div>}
-      {error && <div className="rounded-lg bg-red-50 text-red-700 text-sm px-3 py-2">{error}</div>}
+      {message && (
+        <div className="rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm px-4 py-3">
+          {message}
+        </div>
+      )}
+      {error && (
+        <div className="rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3">
+          {error}
+        </div>
+      )}
 
-      <form onSubmit={onSubmit} className="card p-5 space-y-4">
-        <div>
-          <label className="label">Vai trò</label>
-          <input className="input bg-slate-50" value={user?.role || ''} disabled />
-        </div>
-        <div>
-          <label className="label">Họ và tên</label>
-          <input className="input" value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} required />
-        </div>
-        <div>
-          <label className="label">Email</label>
-          <input className="input" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
-        </div>
-        <div>
-          <label className="label">Số điện thoại</label>
-          <input className="input" value={form.phone || ''} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+      <form onSubmit={onSubmit} className="rounded-2xl border border-indigo-100 bg-white p-6 shadow-sm space-y-4">
+        <h3 className="font-semibold text-slate-800 flex items-center gap-2">
+          <Shield size={18} className="text-indigo-600" /> Thông tin cá nhân
+        </h3>
+        <div className="grid sm:grid-cols-2 gap-4">
+          <div className="sm:col-span-2">
+            <label className="label">Vai trò</label>
+            <input className="input bg-slate-50" value={user?.role || ''} disabled />
+          </div>
+          <div className="sm:col-span-2">
+            <label className="label">Họ và tên</label>
+            <input
+              className="input"
+              value={form.fullName}
+              onChange={(e) => setForm({ ...form, fullName: e.target.value })}
+              required
+            />
+          </div>
+          <div>
+            <label className="label">Email</label>
+            <input
+              className="input"
+              type="email"
+              value={form.email}
+              onChange={(e) => setForm({ ...form, email: e.target.value })}
+              required
+            />
+          </div>
+          <div>
+            <label className="label">Số điện thoại</label>
+            <input
+              className="input"
+              value={form.phone || ''}
+              onChange={(e) => setForm({ ...form, phone: e.target.value })}
+            />
+          </div>
         </div>
         <button type="submit" className="btn-primary" disabled={loading}>
-          {loading ? 'Đang lưu...' : 'Lưu thay đổi'}
+          {loading ? 'Đang lưu…' : 'Lưu hồ sơ'}
+        </button>
+      </form>
+
+      <form
+        onSubmit={onChangePassword}
+        className="rounded-2xl border border-slate-200 bg-slate-50 p-6 shadow-sm space-y-4"
+      >
+        <h3 className="font-semibold text-slate-800 flex items-center gap-2">
+          <Lock size={18} className="text-slate-600" /> Đổi mật khẩu
+        </h3>
+        <div>
+          <label className="label">Mật khẩu hiện tại</label>
+          <input
+            className="input"
+            type="password"
+            value={pwd.currentPassword}
+            onChange={(e) => setPwd({ ...pwd, currentPassword: e.target.value })}
+            required
+            autoComplete="current-password"
+          />
+        </div>
+        <div className="grid sm:grid-cols-2 gap-4">
+          <div>
+            <label className="label">Mật khẩu mới</label>
+            <input
+              className="input"
+              type="password"
+              value={pwd.newPassword}
+              onChange={(e) => setPwd({ ...pwd, newPassword: e.target.value })}
+              required
+              minLength={6}
+              autoComplete="new-password"
+            />
+          </div>
+          <div>
+            <label className="label">Xác nhận mật khẩu mới</label>
+            <input
+              className="input"
+              type="password"
+              value={pwd.confirm}
+              onChange={(e) => setPwd({ ...pwd, confirm: e.target.value })}
+              required
+              minLength={6}
+              autoComplete="new-password"
+            />
+          </div>
+        </div>
+        <button type="submit" className="btn-secondary" disabled={pwdLoading}>
+          {pwdLoading ? 'Đang đổi…' : 'Đổi mật khẩu'}
         </button>
       </form>
     </div>

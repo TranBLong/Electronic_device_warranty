@@ -1,6 +1,6 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import {
-  LayoutDashboard, Package, Shield, Wrench, Users, Boxes, Tags, User, LogOut, Menu, X, Bell,
+  LayoutDashboard, Package, Shield, Wrench, Users, Boxes, Tags, User, LogOut, Menu, X, Bell, Building2,
 } from 'lucide-react';
 import { useState } from 'react';
 import { useAuthStore } from '../store/authStore';
@@ -13,8 +13,9 @@ const navItems: { to: string; label: string; icon: React.ReactNode; roles?: User
   { to: '/warranty-cards', label: 'Phiếu bảo hành', icon: <Shield size={18} /> },
   { to: '/repair-requests', label: 'Sửa chữa', icon: <Wrench size={18} /> },
   { to: '/parts', label: 'Linh kiện', icon: <Boxes size={18} />, roles: ['Admin', 'Manager', 'Technician', 'Receptionist'] },
-  { to: '/categories', label: 'Danh mục', icon: <Tags size={18} />, roles: ['Admin'] },
-  { to: '/users', label: 'Người dùng', icon: <Users size={18} />, roles: ['Admin'] },
+  { to: '/categories', label: 'Danh mục', icon: <Tags size={18} />, roles: ['Admin', 'Manager'] },
+  { to: '/service-centers', label: 'Trung tâm BH', icon: <Building2 size={18} />, roles: ['Admin', 'Manager', 'Receptionist'] },
+  { to: '/users', label: 'Người dùng', icon: <Users size={18} />, roles: ['Admin', 'Manager'] },
   { to: '/profile', label: 'Hồ sơ', icon: <User size={18} /> },
 ];
 
