@@ -76,6 +76,7 @@ Swagger: **http://localhost:5000/swagger**
 | customer01@warranty.local | Customer@123 | Customer |
 
 > Password được hash bằng BCrypt trong code. **Không** cần (và không nên) insert plaintext password qua SSMS.
+> Các tài khoản demo chỉ được seed ở Development và khi bảng `Users` còn trống; không dùng các mật khẩu này trong production.
 
 ---
 
@@ -101,18 +102,16 @@ SELECT Id, Name, Address, Phone FROM dbo.ServiceCenters;
 SELECT Id, Code, Name, UnitPrice, StockQuantity FROM dbo.Parts;
 ```
 
-### Script SQL kèm theo (tham khảo schema / dump)
+### Script SQL hỗ trợ
 
 Trong thư mục backend:
 
 | File | Mô tả |
 |------|--------|
-| `Data/SQL/SQLData_utf8.sql` | Dump schema/data (UTF-8, mở được trong SSMS) |
-| `Data/SQL/SQLData2_utf8.sql` | Dump mở rộng |
 | `scripts/bootstrap-admin.sql` | Tạo admin thủ công (cần BCrypt hash) |
 | `scripts/SeedVerify_SSMS.sql` | Query kiểm tra seed |
 
-**Khuyến nghị:** để EF Migration + Seeder tạo data (đúng hash mật khẩu). Chỉ dùng file dump khi cần khôi phục schema tham khảo.
+Các dump SQL cũ trong `Data/SQL` đã được gỡ khỏi repo vì chứa thông tin xác thực/hash. Dùng EF Migrations và `DatabaseSeeder` để tạo schema và dữ liệu demo. Không xóa các migration cũ, kể cả migration rỗng, nếu database có thể đã áp dụng chúng; tạo migration mới cho thay đổi schema tiếp theo.
 
 ---
 

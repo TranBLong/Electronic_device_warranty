@@ -4,6 +4,8 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);1591</NoWarn>
     <UserSecretsId>warranty-e-warranty-dev-secrets</UserSecretsId>
     <DefaultItemExcludes>$(DefaultItemExcludes);Warranty.Tests/**</DefaultItemExcludes>
     <DefaultItemExcludesInProjectFolder>$(DefaultItemExcludesInProjectFolder);Warranty.Tests/**</DefaultItemExcludesInProjectFolder>

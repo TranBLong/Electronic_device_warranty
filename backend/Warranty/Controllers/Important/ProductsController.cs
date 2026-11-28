@@ -16,6 +16,7 @@ namespace Warranty.Controllers;
 [Route("api/products")]
 public sealed class ProductsController(AppDbContext dbContext) : ControllerBase
 {
+    /// <summary>Lists products with filtering, sorting, and pagination.</summary>
     [HttpGet]
     public async Task<ActionResult<PagedResult<ProductResponse>>> GetAll(
         [FromQuery] QueryParameters query,
@@ -46,6 +47,7 @@ public sealed class ProductsController(AppDbContext dbContext) : ControllerBase
         return Ok(PagedResult<ProductResponse>.Create(list.Select(ToResponse).ToList(), query.PageNumber, query.Take, total));
     }
 
+    /// <summary>Gets a product by ID.</summary>
     [HttpGet("{id:int}")]
     public async Task<ActionResult<ProductResponse>> GetById(int id, CancellationToken cancellationToken)
     {
@@ -55,6 +57,7 @@ public sealed class ProductsController(AppDbContext dbContext) : ControllerBase
         return product is null ? NotFound() : Ok(ToResponse(product));
     }
 
+    /// <summary>Creates a product.</summary>
     [Authorize(Policy = Policies.CanManageCatalog)]
     [HttpPost]
     public async Task<ActionResult<ProductResponse>> Create(ProductRequest request, CancellationToken cancellationToken)
@@ -94,6 +97,7 @@ public sealed class ProductsController(AppDbContext dbContext) : ControllerBase
         return CreatedAtAction(nameof(GetById), new { id = product.Id }, ToResponse(product));
     }
 
+    /// <summary>Updates a product.</summary>
     [Authorize(Policy = Policies.CanManageCatalog)]
     [HttpPut("{id:int}")]
     public async Task<ActionResult<ProductResponse>> Update(int id, ProductRequest request, CancellationToken cancellationToken)
@@ -133,6 +137,7 @@ public sealed class ProductsController(AppDbContext dbContext) : ControllerBase
         return Ok(ToResponse(product));
     }
 
+    /// <summary>Deletes an unreferenced product.</summary>
     [Authorize(Policy = Policies.CanManageCatalog)]
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> Delete(int id, CancellationToken cancellationToken)

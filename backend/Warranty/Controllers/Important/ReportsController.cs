@@ -12,6 +12,7 @@ namespace Warranty.Controllers;
 [Route("api/reports")]
 public sealed class ReportsController(AppDbContext dbContext) : ControllerBase
 {
+    /// <summary>Gets warranty and repair request summary metrics.</summary>
     [HttpGet("summary")]
     public async Task<ActionResult<DashboardSummaryResponse>> GetSummary(CancellationToken cancellationToken)
     {

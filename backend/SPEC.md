@@ -55,6 +55,16 @@
 - Endpoint `/api/auth/refresh` dùng Refresh Token còn hiệu lực để cấp Access Token mới, xoay vòng (rotate) Refresh Token cũ.
 - Payload JWT chứa: `sub` (UserId), `role`, `email`.
 
+### Tài khoản demo (Development)
+| Email | Mật khẩu | Vai trò |
+|---|---|---|
+| `admin@warranty.local` | `Admin@123` | Admin |
+| `manager@warranty.local` | `Manager@123` | Manager |
+| `reception@warranty.local` | `Receptionist@123` | Receptionist |
+| `tech01@warranty.local` | `Technician@123` | Technician |
+| `customer01@warranty.local` | `Customer@123` | Customer |
+
+Các tài khoản được tạo khi `DatabaseSeeder` chạy trong Development và bảng `Users` đang trống. Chỉ dùng mật khẩu này cho môi trường demo.
+
 ## Phạm vi hiện tại
-Chỉ các entity/luồng ở trên. Các phần sau **chưa làm** trong giai đoạn này:
-ServiceCenter, SparePart, Invoice/Payment, Notification, Feedback, AuditLog.
+Ngoài các luồng cốt lõi phía trên, phiên bản hiện tại còn triển khai Category, Part, RepairRequestPart, ServiceCenter, Invoice, Payment, Notification, RepairRequestAttachment và Feedback. Không có chức năng AuditLog.

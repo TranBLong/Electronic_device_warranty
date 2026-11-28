@@ -12,6 +12,7 @@ namespace Warranty.Controllers;
 [Route("api/notifications")]
 public sealed class NotificationsController(AppDbContext db) : ControllerBase
 {
+    /// <summary>Lists notifications for the current user.</summary>
     [HttpGet]
     public async Task<ActionResult<PagedResult<NotificationResponse>>> GetMine(
         [FromQuery] QueryParameters query,
@@ -33,6 +34,7 @@ public sealed class NotificationsController(AppDbContext db) : ControllerBase
         return Ok(PagedResult<NotificationResponse>.Create(items, query.PageNumber, query.Take, total));
     }
 
+    /// <summary>Gets the current user's unread notification count.</summary>
     [HttpGet("unread-count")]
     public async Task<ActionResult<object>> UnreadCount(CancellationToken ct)
     {
@@ -41,6 +43,7 @@ public sealed class NotificationsController(AppDbContext db) : ControllerBase
         return Ok(new { count });
     }
 
+    /// <summary>Marks a notification as read.</summary>
     [HttpPut("{id:int}/read")]
     public async Task<IActionResult> MarkRead(int id, CancellationToken ct)
     {
@@ -52,6 +55,7 @@ public sealed class NotificationsController(AppDbContext db) : ControllerBase
         return NoContent();
     }
 
+    /// <summary>Marks all notifications for the current user as read.</summary>
     [HttpPut("read-all")]
     public async Task<IActionResult> MarkAllRead(CancellationToken ct)
     {

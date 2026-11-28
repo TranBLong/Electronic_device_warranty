@@ -18,9 +18,19 @@ dotnet ef database update
 
 Environment variable equivalents are `Jwt__SigningKey` and `ConnectionStrings__DefaultConnection`. JWT issuer and audience are configured in `appsettings.json`; access tokens expire after 30 minutes and refresh tokens after 7 days. Passwords must be at least 8 characters and no more than 72 UTF-8 bytes because BCrypt has a 72-byte input limit.
 
-## First Admin account
+## Development demo accounts
 
-There is no default account or automatic privileged-user seed. After applying migrations, generate a BCrypt password hash locally with `BCrypt.Net.BCrypt.HashPassword(...)`, replace both placeholders in [`scripts/bootstrap-admin.sql`](./scripts/bootstrap-admin.sql), and execute that script against the `Warranty` database. Never store the plaintext password in the script or source control. The `Role` database value is `Admin`.
+In Development, `DatabaseSeeder` inserts the following accounts when the `Users` table is empty:
+
+| Email | Password | Role |
+|---|---|---|
+| `admin@warranty.local` | `Admin@123` | Admin |
+| `manager@warranty.local` | `Manager@123` | Manager |
+| `reception@warranty.local` | `Receptionist@123` | Receptionist |
+| `tech01@warranty.local` | `Technician@123` | Technician |
+| `customer01@warranty.local` | `Customer@123` | Customer |
+
+Passwords are hashed with BCrypt. The demo credentials are for local development only; production does not run the seeder. To provision a production administrator, use [`scripts/bootstrap-admin.sql`](./scripts/bootstrap-admin.sql) with a locally generated BCrypt hash and a separately chosen password. Never commit plaintext passwords, hashes, or live tokens.
 
 ## API routes
 
@@ -51,6 +61,6 @@ Repair requests created by a Customer have a null `ReceptionistId`; receptionist
 
 Repair request attachments are uploaded as `multipart/form-data` using the `file` field. Allowed extensions and content types are configured under `Upload`; JPEG, PNG, and PDF uploads are also checked against their file signatures.
 
-## Scope
+## Implemented scope
 
-The API implements User, Product, WarrantyCard, RepairRequest, RepairRequestStatusHistory, and RefreshToken. ServiceCenter, SparePart, Invoice/Payment, Notification, Feedback, and AuditLog are not included.
+The API currently includes users and authentication, products and categories, warranty cards, repair requests and status history, repair parts and attachments, service centers, invoices and payments, notifications, feedback, and dashboard reporting. EF Core migrations are applied automatically at startup; keep existing migration files (including historical or empty migrations) if a database may already have applied them. Add future schema changes as new migrations.

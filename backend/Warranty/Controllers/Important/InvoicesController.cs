@@ -15,6 +15,7 @@ namespace Warranty.Controllers;
 [Route("api/invoices")]
 public sealed class InvoicesController(AppDbContext db) : ControllerBase
 {
+    /// <summary>Lists invoices visible to billing staff.</summary>
     [HttpGet]
     [Authorize(Policy = Policies.CanManageBilling)]
     public async Task<ActionResult<PagedResult<InvoiceResponse>>> GetAll(
@@ -44,6 +45,7 @@ public sealed class InvoicesController(AppDbContext db) : ControllerBase
         return Ok(PagedResult<InvoiceResponse>.Create(items, query.PageNumber, query.Take, total));
     }
 
+    /// <summary>Gets an invoice by ID.</summary>
     [HttpGet("{id:int}")]
     public async Task<ActionResult<InvoiceResponse>> GetById(int id, CancellationToken ct)
     {
@@ -61,6 +63,7 @@ public sealed class InvoicesController(AppDbContext db) : ControllerBase
         return Ok(ToResponse(inv));
     }
 
+    /// <summary>Lists invoices belonging to the current customer.</summary>
     [HttpGet("my")]
     [Authorize(Roles = Roles.Customer)]
     public async Task<ActionResult<IReadOnlyList<InvoiceResponse>>> GetMy(CancellationToken ct)
@@ -75,6 +78,7 @@ public sealed class InvoicesController(AppDbContext db) : ControllerBase
         return Ok(items);
     }
 
+    /// <summary>Creates an invoice for a repair request.</summary>
     [HttpPost]
     [Authorize(Policy = Policies.CanManageBilling)]
     public async Task<ActionResult<InvoiceResponse>> Create([FromBody] CreateInvoiceRequest req, CancellationToken ct)

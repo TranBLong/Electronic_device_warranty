@@ -22,6 +22,7 @@ public sealed class AuthController(
 {
     // refresh lifetime from JwtOptions via TokenService
 
+    /// <summary>Registers a customer account.</summary>
     [AllowAnonymous]
     [HttpPost("register")]
     public async Task<ActionResult<UserResponse>> Register(RegisterRequest request, CancellationToken cancellationToken)
@@ -62,6 +63,7 @@ public sealed class AuthController(
         return Created("/api/auth/register", ToResponse(user));
     }
 
+    /// <summary>Authenticates a user and returns access and refresh tokens.</summary>
     [AllowAnonymous]
     [HttpPost("login")]
     public async Task<ActionResult<AuthResponse>> Login(LoginRequest request, CancellationToken cancellationToken)
@@ -79,6 +81,7 @@ public sealed class AuthController(
         return Ok(await IssueTokensAsync(user, cancellationToken));
     }
 
+    /// <summary>Rotates a refresh token and returns a new token pair.</summary>
     [AllowAnonymous]
     [HttpPost("refresh")]
     public async Task<ActionResult<AuthResponse>> Refresh(RefreshRequest request, CancellationToken cancellationToken)

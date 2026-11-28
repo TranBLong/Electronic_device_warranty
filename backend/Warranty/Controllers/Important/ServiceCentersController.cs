@@ -13,6 +13,7 @@ namespace Warranty.Controllers;
 [Route("api/service-centers")]
 public sealed class ServiceCentersController(AppDbContext dbContext) : ControllerBase
 {
+    /// <summary>Lists active service centers.</summary>
     [HttpGet]
     public async Task<ActionResult<PagedResult<ServiceCenterResponse>>> GetAll(
         [FromQuery] QueryParameters query,
@@ -50,6 +51,7 @@ public sealed class ServiceCentersController(AppDbContext dbContext) : Controlle
         return Ok(PagedResult<ServiceCenterResponse>.Create(items, query.PageNumber, query.Take, total));
     }
 
+    /// <summary>Gets a service center by ID.</summary>
     [HttpGet("{id:int}")]
     public async Task<ActionResult<ServiceCenterResponse>> GetById(int id, CancellationToken cancellationToken)
     {
@@ -59,6 +61,7 @@ public sealed class ServiceCentersController(AppDbContext dbContext) : Controlle
         return Ok(new ServiceCenterResponse(center.Id, center.Name, center.Address, center.Phone, center.IsActive, center.CreatedAt));
     }
 
+    /// <summary>Creates a service center.</summary>
     [HttpPost]
     [Authorize(Roles = "Admin,Manager")]
     public async Task<ActionResult<ServiceCenterResponse>> Create(
@@ -78,6 +81,7 @@ public sealed class ServiceCentersController(AppDbContext dbContext) : Controlle
             new ServiceCenterResponse(center.Id, center.Name, center.Address, center.Phone, center.IsActive, center.CreatedAt));
     }
 
+    /// <summary>Updates a service center.</summary>
     [HttpPut("{id:int}")]
     [Authorize(Roles = "Admin,Manager")]
     public async Task<ActionResult<ServiceCenterResponse>> Update(
@@ -94,6 +98,7 @@ public sealed class ServiceCentersController(AppDbContext dbContext) : Controlle
         return Ok(new ServiceCenterResponse(center.Id, center.Name, center.Address, center.Phone, center.IsActive, center.CreatedAt));
     }
 
+    /// <summary>Deactivates a service center.</summary>
     [HttpDelete("{id:int}")]
     [Authorize(Roles = nameof(UserRole.Admin))]
     public async Task<IActionResult> Deactivate(int id, CancellationToken cancellationToken)

@@ -13,6 +13,7 @@ namespace Warranty.Controllers;
 [Route("api/parts")]
 public sealed class PartsController(AppDbContext dbContext) : ControllerBase
 {
+    /// <summary>Lists active parts, optionally filtered to available stock.</summary>
     [HttpGet]
     [Authorize(Roles = "Admin,Manager,Technician,Receptionist")]
     public async Task<ActionResult<PagedResult<PartResponse>>> GetAll(
@@ -52,6 +53,7 @@ public sealed class PartsController(AppDbContext dbContext) : ControllerBase
         return Ok(PagedResult<PartResponse>.Create(items, query.PageNumber, query.Take, total));
     }
 
+    /// <summary>Gets a part by ID.</summary>
     [HttpGet("{id:int}")]
     [Authorize(Roles = "Admin,Manager,Technician,Receptionist")]
     public async Task<ActionResult<PartResponse>> GetById(int id, CancellationToken cancellationToken)
@@ -61,6 +63,7 @@ public sealed class PartsController(AppDbContext dbContext) : ControllerBase
         return Ok(new PartResponse(part.Id, part.Code, part.Name, part.Description, part.UnitPrice, part.StockQuantity, part.IsActive, part.CreatedAt));
     }
 
+    /// <summary>Creates a part.</summary>
     [HttpPost]
     [Authorize(Roles = "Admin,Manager")]
     public async Task<ActionResult<PartResponse>> Create([FromBody] PartRequest request, CancellationToken cancellationToken)
@@ -85,6 +88,7 @@ public sealed class PartsController(AppDbContext dbContext) : ControllerBase
             new PartResponse(part.Id, part.Code, part.Name, part.Description, part.UnitPrice, part.StockQuantity, part.IsActive, part.CreatedAt));
     }
 
+    /// <summary>Updates a part.</summary>
     [HttpPut("{id:int}")]
     [Authorize(Roles = "Admin,Manager")]
     public async Task<ActionResult<PartResponse>> Update(int id, [FromBody] PartRequest request, CancellationToken cancellationToken)
@@ -107,6 +111,7 @@ public sealed class PartsController(AppDbContext dbContext) : ControllerBase
         return Ok(new PartResponse(part.Id, part.Code, part.Name, part.Description, part.UnitPrice, part.StockQuantity, part.IsActive, part.CreatedAt));
     }
 
+    /// <summary>Deactivates a part.</summary>
     [HttpDelete("{id:int}")]
     [Authorize(Roles = "Admin,Manager")]
     public async Task<IActionResult> Deactivate(int id, CancellationToken cancellationToken)

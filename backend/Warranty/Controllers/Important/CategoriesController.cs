@@ -14,6 +14,7 @@ namespace Warranty.Controllers;
 [Route("api/categories")]
 public sealed class CategoriesController(AppDbContext dbContext) : ControllerBase
 {
+    /// <summary>Lists active categories.</summary>
     [HttpGet]
     public async Task<ActionResult<PagedResult<CategoryResponse>>> GetAll(
         [FromQuery] QueryParameters query,
@@ -45,6 +46,7 @@ public sealed class CategoriesController(AppDbContext dbContext) : ControllerBas
         return Ok(PagedResult<CategoryResponse>.Create(items, query.PageNumber, query.Take, total));
     }
 
+    /// <summary>Gets a category by ID.</summary>
     [HttpGet("{id:int}")]
     public async Task<ActionResult<CategoryResponse>> GetById(int id, CancellationToken cancellationToken)
     {
@@ -54,6 +56,7 @@ public sealed class CategoriesController(AppDbContext dbContext) : ControllerBas
         return Ok(new CategoryResponse(category.Id, category.Name, category.Description, category.IsActive, category.CreatedAt));
     }
 
+    /// <summary>Creates a category.</summary>
     [HttpPost]
     [Authorize(Policy = Policies.CanManageCatalog)]
     public async Task<ActionResult<CategoryResponse>> Create(
@@ -72,6 +75,7 @@ public sealed class CategoriesController(AppDbContext dbContext) : ControllerBas
             new CategoryResponse(category.Id, category.Name, category.Description, category.IsActive, category.CreatedAt));
     }
 
+    /// <summary>Updates a category.</summary>
     [HttpPut("{id:int}")]
     [Authorize(Policy = Policies.CanManageCatalog)]
     public async Task<ActionResult<CategoryResponse>> Update(
@@ -87,6 +91,7 @@ public sealed class CategoriesController(AppDbContext dbContext) : ControllerBas
         return Ok(new CategoryResponse(category.Id, category.Name, category.Description, category.IsActive, category.CreatedAt));
     }
 
+    /// <summary>Deactivates a category.</summary>
     [HttpDelete("{id:int}")]
     [Authorize(Policy = Policies.CanManageCatalog)]
     public async Task<IActionResult> Deactivate(int id, CancellationToken cancellationToken)

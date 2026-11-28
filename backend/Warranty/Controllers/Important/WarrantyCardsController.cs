@@ -15,6 +15,7 @@ public sealed class WarrantyCardsController(
     AppDbContext dbContext,
     IWarrantyCardService warrantyCardService) : ControllerBase
 {
+    /// <summary>Lists warranty cards visible to the current user.</summary>
     [HttpGet]
     public async Task<ActionResult<PagedResult<WarrantyCardResponse>>> GetAll(
         [FromQuery] QueryParameters query,
@@ -83,6 +84,7 @@ public sealed class WarrantyCardsController(
         return Ok(PagedResult<WarrantyCardResponse>.Create(items, query.PageNumber, query.Take, total));
     }
 
+    /// <summary>Gets a warranty card by ID.</summary>
     [HttpGet("{id:int}")]
     public async Task<ActionResult<WarrantyCardResponse>> GetById(int id, CancellationToken cancellationToken)
     {
@@ -109,6 +111,7 @@ public sealed class WarrantyCardsController(
         return Ok(WarrantyCardMapping.ToResponse(card));
     }
 
+    /// <summary>Looks up warranty status by product serial number.</summary>
     [AllowAnonymous]
     [HttpGet("by-serial/{serialNumber}")]
     public async Task<ActionResult<WarrantyCardLookupResponse>> LookupBySerial(
@@ -136,6 +139,7 @@ public sealed class WarrantyCardsController(
             status));
     }
 
+    /// <summary>Creates a warranty card.</summary>
     [Authorize(Roles = "Admin,Manager,Receptionist")]
     [HttpPost]
     public async Task<ActionResult<WarrantyCardResponse>> Create(
@@ -148,6 +152,7 @@ public sealed class WarrantyCardsController(
         return CreatedAtAction(nameof(GetById), new { id = result.Value!.Id }, result.Value);
     }
 
+    /// <summary>Updates a warranty card.</summary>
     [Authorize(Roles = "Admin,Manager,Receptionist")]
     [HttpPut("{id:int}")]
     public async Task<ActionResult<WarrantyCardResponse>> Update(
@@ -159,6 +164,7 @@ public sealed class WarrantyCardsController(
         return result.IsSuccess ? Ok(result.Value) : ServiceError<WarrantyCardResponse>(result);
     }
 
+    /// <summary>Voids or deletes a warranty card.</summary>
     [Authorize(Roles = "Admin,Manager,Receptionist")]
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> VoidOrDelete(int id, CancellationToken cancellationToken)

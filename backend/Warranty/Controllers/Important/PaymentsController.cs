@@ -14,6 +14,7 @@ namespace Warranty.Controllers;
 [Route("api/payments")]
 public sealed class PaymentsController(AppDbContext db, NotificationService notifications) : ControllerBase
 {
+    /// <summary>Lists payments recorded for an invoice.</summary>
     [HttpGet]
     [Authorize(Policy = Policies.CanManageBilling)]
     public async Task<ActionResult<IReadOnlyList<PaymentResponse>>> GetByInvoice(
@@ -30,6 +31,7 @@ public sealed class PaymentsController(AppDbContext db, NotificationService noti
         return Ok(items);
     }
 
+    /// <summary>Records a payment against an invoice.</summary>
     [HttpPost]
     [Authorize(Policy = Policies.CanManageBilling)]
     public async Task<ActionResult<PaymentResponse>> Create(

@@ -14,6 +14,7 @@ namespace Warranty.Controllers;
 [Route("api/feedbacks")]
 public sealed class FeedbacksController(AppDbContext db) : ControllerBase
 {
+    /// <summary>Lists customer feedback.</summary>
     [HttpGet]
     [Authorize(Policy = Policies.AdminOrManager)]
     public async Task<ActionResult<IReadOnlyList<FeedbackResponse>>> GetAll(CancellationToken ct)
@@ -28,6 +29,7 @@ public sealed class FeedbacksController(AppDbContext db) : ControllerBase
         return Ok(items);
     }
 
+    /// <summary>Gets feedback for a repair request.</summary>
     [HttpGet("by-repair/{repairRequestId:int}")]
     public async Task<ActionResult<FeedbackResponse>> GetByRepair(int repairRequestId, CancellationToken ct)
     {
@@ -39,6 +41,7 @@ public sealed class FeedbacksController(AppDbContext db) : ControllerBase
             f.Rating, f.Comment, f.CreatedAt));
     }
 
+    /// <summary>Submits customer feedback for a completed repair request.</summary>
     [HttpPost]
     [Authorize(Roles = Roles.Customer)]
     public async Task<ActionResult<FeedbackResponse>> Create(

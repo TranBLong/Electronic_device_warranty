@@ -6,6 +6,7 @@
 *.suo
 appsettings.*.local.json
 **/secrets.json
+backend/Data/SQL/*.sql
 
 # Frontend
 **/node_modules/

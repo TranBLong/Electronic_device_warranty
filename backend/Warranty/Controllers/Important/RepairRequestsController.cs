@@ -17,6 +17,7 @@ public sealed class RepairRequestsController(
     IRepairRequestService repairRequestService,
     RepairRequestAttachmentService attachmentService) : ControllerBase
 {
+    /// <summary>Lists repair requests visible to the current user.</summary>
     [HttpGet]
     public async Task<ActionResult<PagedResult<RepairRequestResponse>>> GetAll(
         [FromQuery] QueryParameters query,
@@ -89,6 +90,7 @@ public sealed class RepairRequestsController(
         return Ok(PagedResult<RepairRequestResponse>.Create(items, query.PageNumber, query.Take, total));
     }
 
+    /// <summary>Gets a repair request by ID.</summary>
     [HttpGet("{id:int}")]
     public async Task<ActionResult<RepairRequestResponse>> GetById(int id, CancellationToken cancellationToken)
     {
@@ -100,6 +102,7 @@ public sealed class RepairRequestsController(
         return Ok(RepairRequestMapping.ToResponse(request));
     }
 
+    /// <summary>Creates a repair request for an eligible warranty card.</summary>
     [HttpPost]
     public async Task<ActionResult<RepairRequestResponse>> Create(
         CreateRepairRequest request,
@@ -125,6 +128,7 @@ public sealed class RepairRequestsController(
         return CreatedAtAction(nameof(GetById), new { id = result.Value!.Id }, result.Value);
     }
 
+    /// <summary>Assigns a technician to a repair request.</summary>
     [Authorize(Roles = "Admin,Manager,Receptionist")]
     [HttpPut("{id:int}/technician")]
     public async Task<ActionResult<RepairRequestResponse>> AssignTechnician(
@@ -139,6 +143,7 @@ public sealed class RepairRequestsController(
     /// <summary>
     /// Technician cập nhật status job được gán; Admin/Manager cũng được phép override.
     /// </summary>
+    /// <summary>Changes the repair request status.</summary>
     [Authorize(Roles = "Admin,Manager,Technician")]
     [HttpPut("{id:int}/status")]
     public async Task<ActionResult<RepairRequestResponse>> ChangeStatus(
@@ -160,6 +165,7 @@ public sealed class RepairRequestsController(
         return result.IsSuccess ? Ok(result.Value) : ServiceError<RepairRequestResponse>(result);
     }
 
+    /// <summary>Updates a repair request.</summary>
     [Authorize(Roles = "Admin,Manager,Receptionist")]
     [HttpPut("{id:int}")]
     public async Task<ActionResult<RepairRequestResponse>> Update(
@@ -181,6 +187,7 @@ public sealed class RepairRequestsController(
         return Ok(RepairRequestMapping.ToResponse(repairRequest));
     }
 
+    /// <summary>Cancels a repair request.</summary>
     [Authorize(Roles = "Admin,Manager,Receptionist")]
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> Cancel(int id, CancellationToken cancellationToken)
@@ -214,6 +221,7 @@ public sealed class RepairRequestsController(
     }
 
 
+    /// <summary>Lists parts used for a repair request.</summary>
     [HttpGet("{id:int}/parts")]
     public async Task<ActionResult<IReadOnlyList<RepairPartLineResponse>>> GetParts(int id, CancellationToken cancellationToken)
     {
@@ -233,6 +241,7 @@ public sealed class RepairRequestsController(
         return Ok(lines);
     }
 
+    /// <summary>Adds a part to a repair request.</summary>
     [Authorize(Roles = "Admin,Manager,Technician")]
     [HttpPost("{id:int}/parts")]
     public async Task<ActionResult<RepairPartLineResponse>> AddPart(
@@ -249,6 +258,7 @@ public sealed class RepairRequestsController(
         return result.IsSuccess ? Ok(result.Value) : ServiceError<RepairPartLineResponse>(result);
     }
 
+    /// <summary>Removes a part from a repair request.</summary>
     [Authorize(Roles = "Admin,Manager,Technician")]
     [HttpDelete("{id:int}/parts/{lineId:int}")]
     public async Task<IActionResult> RemovePart(int id, int lineId, CancellationToken cancellationToken)
@@ -275,6 +285,7 @@ public sealed class RepairRequestsController(
         return NoContent();
     }
 
+    /// <summary>Uploads an attachment to a repair request.</summary>
     [HttpPost("{id:int}/attachments")]
     [Consumes("multipart/form-data")]
     public async Task<ActionResult<RepairRequestAttachmentResponse>> UploadAttachment(
@@ -306,6 +317,7 @@ public sealed class RepairRequestsController(
         return CreatedAtAction(nameof(GetAttachments), new { id }, ToAttachmentResponse(attachment));
     }
 
+    /// <summary>Lists attachments for a repair request.</summary>
     [HttpGet("{id:int}/attachments")]
     public async Task<ActionResult<IReadOnlyList<RepairRequestAttachmentResponse>>> GetAttachments(
         int id,
@@ -324,6 +336,7 @@ public sealed class RepairRequestsController(
         return Ok(attachments);
     }
 
+    /// <summary>Downloads a repair request attachment.</summary>
     [HttpGet("{id:int}/attachments/{attachmentId:int}/download")]
     public async Task<IActionResult> DownloadAttachment(
         int id,

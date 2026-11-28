@@ -62,6 +62,8 @@ npm run dev
 | tech01@warranty.local | Technician@123 | Technician |
 | customer01@warranty.local | Customer@123 | Customer |
 
+Các tài khoản trên được `DatabaseSeeder` tạo trong môi trường Development khi bảng Users còn trống; đây là thông tin demo, không dùng trong production.
+
 ## Bảo mật
 
 - Mật khẩu: **BCrypt** (`PasswordHashing.Hash` / `Verify`)
