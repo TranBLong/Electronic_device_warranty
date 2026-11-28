@@ -1,4 +1,5 @@
 export type UserRole = 'Admin' | 'Manager' | 'Receptionist' | 'Technician' | 'Customer';
+export type Gender = 'Male' | 'Female' | 'Other';
 export type WarrantyStatus = 'Active' | 'Expired' | 'Voided';
 export type RepairRequestStatus = 'Received' | 'InProgress' | 'Completed' | 'Returned' | 'Cancelled';
 
@@ -7,6 +8,9 @@ export interface User {
   fullName: string;
   email: string;
   phone?: string | null;
+  address?: string | null;
+  dateOfBirth?: string | null;
+  gender?: Gender | null;
   role: UserRole;
   isActive: boolean;
   createdAt: string;

@@ -17,6 +17,14 @@ public sealed class AdminCreateUserRequest
     [StringLength(30)]
     public string? Phone { get; init; }
 
+    [StringLength(300)]
+    public string? Address { get; init; }
+
+    public DateTime? DateOfBirth { get; init; }
+
+    [EnumDataType(typeof(Gender))]
+    public Gender? Gender { get; init; }
+
     [Required, EnumDataType(typeof(UserRole))]
     public UserRole? Role { get; init; }
 
@@ -33,6 +41,14 @@ public sealed class AdminUpdateUserRequest
 
     [StringLength(30)]
     public string? Phone { get; init; }
+
+    [StringLength(300)]
+    public string? Address { get; init; }
+
+    public DateTime? DateOfBirth { get; init; }
+
+    [EnumDataType(typeof(Gender))]
+    public Gender? Gender { get; init; }
 
     [Required, EnumDataType(typeof(UserRole))]
     public UserRole? Role { get; init; }
@@ -53,6 +69,14 @@ public sealed class UpdateMyProfileRequest
 
     [StringLength(30)]
     public string? Phone { get; init; }
+
+    [StringLength(300)]
+    public string? Address { get; init; }
+
+    public DateTime? DateOfBirth { get; init; }
+
+    [EnumDataType(typeof(Gender))]
+    public Gender? Gender { get; init; }
 }
 
 public sealed record UserResponse(
@@ -60,6 +84,9 @@ public sealed record UserResponse(
     string FullName,
     string Email,
     string? Phone,
+    string? Address,
+    DateTime? DateOfBirth,
+    Gender? Gender,
     UserRole Role,
     bool IsActive,
     DateTime CreatedAt);

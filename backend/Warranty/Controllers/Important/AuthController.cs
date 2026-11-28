@@ -43,6 +43,9 @@ public sealed class AuthController(
             Email = normalizedEmail,
             PasswordHash = PasswordHashing.Hash(request.Password),
             Phone = request.Phone?.Trim(),
+            Address = request.Address?.Trim(),
+            DateOfBirth = request.DateOfBirth,
+            Gender = request.Gender,
             Role = UserRole.Customer
         };
 
@@ -154,6 +157,9 @@ public sealed class AuthController(
         user.FullName,
         user.Email,
         user.Phone,
+        user.Address,
+        user.DateOfBirth,
+        user.Gender,
         user.Role,
         user.IsActive,
         user.CreatedAt);

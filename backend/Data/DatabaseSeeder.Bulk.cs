@@ -22,6 +22,14 @@ public static partial class DatabaseSeeder
         ["Apple","Samsung","Dell","HP","Lenovo","Asus","Xiaomi","Sony","LG","Acer"];
     private static readonly string[] ProductKinds =
         ["Laptop","Phone","Tablet","Monitor","Printer","Router","Headset","Keyboard"];
+    private static readonly string[] SampleAddresses =
+    [
+        "12 Nguyễn Huệ, Quận 1, TP. Hồ Chí Minh",
+        "45 Lê Lợi, Quận Hoàn Kiếm, Hà Nội",
+        "88 Trần Phú, Quận Hải Châu, Đà Nẵng",
+        "27 Võ Văn Tần, Quận 3, TP. Hồ Chí Minh",
+        "156 Nguyễn Văn Cừ, Quận Ninh Kiều, Cần Thơ"
+    ];
 
     /// <summary>
     /// Seeds ~1000 realistic users + products + warranty cards for pagination demos.
@@ -50,6 +58,9 @@ public static partial class DatabaseSeeder
                 Email = $"customer{i:D4}@demo.warranty.local",
                 PasswordHash = passwordHash,
                 Phone = $"09{rng.Next(10000000, 99999999)}",
+                Address = SampleAddresses[rng.Next(SampleAddresses.Length)],
+                DateOfBirth = now.AddYears(-rng.Next(18, 68)).AddDays(-rng.Next(365)),
+                Gender = (Gender)rng.Next(3),
                 Role = UserRole.Customer,
                 IsActive = rng.NextDouble() > 0.05,
                 CreatedAt = now.AddDays(-rng.Next(1, 700))
@@ -68,6 +79,9 @@ public static partial class DatabaseSeeder
                 Email = $"tech{i:D3}@demo.warranty.local",
                 PasswordHash = techHash,
                 Phone = $"08{rng.Next(10000000, 99999999)}",
+                Address = SampleAddresses[rng.Next(SampleAddresses.Length)],
+                DateOfBirth = now.AddYears(-rng.Next(22, 61)).AddDays(-rng.Next(365)),
+                Gender = (Gender)rng.Next(3),
                 Role = UserRole.Technician,
                 IsActive = true,
                 CreatedAt = now.AddDays(-rng.Next(30, 400))
@@ -84,6 +98,9 @@ public static partial class DatabaseSeeder
                 Email = $"reception{i:D2}@demo.warranty.local",
                 PasswordHash = PasswordHashing.Hash("Receptionist@123"),
                 Phone = $"07{rng.Next(10000000, 99999999)}",
+                Address = SampleAddresses[rng.Next(SampleAddresses.Length)],
+                DateOfBirth = now.AddYears(-rng.Next(22, 61)).AddDays(-rng.Next(365)),
+                Gender = (Gender)rng.Next(3),
                 Role = UserRole.Receptionist,
                 IsActive = true,
                 CreatedAt = now.AddDays(-rng.Next(60, 500))
@@ -97,6 +114,9 @@ public static partial class DatabaseSeeder
                 Email = $"manager{i:D2}@demo.warranty.local",
                 PasswordHash = PasswordHashing.Hash("Manager@123"),
                 Phone = $"06{rng.Next(10000000, 99999999)}",
+                Address = SampleAddresses[rng.Next(SampleAddresses.Length)],
+                DateOfBirth = now.AddYears(-rng.Next(25, 66)).AddDays(-rng.Next(365)),
+                Gender = (Gender)rng.Next(3),
                 Role = UserRole.Manager,
                 IsActive = true,
                 CreatedAt = now.AddDays(-rng.Next(90, 600))

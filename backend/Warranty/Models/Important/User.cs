@@ -10,6 +10,9 @@ public class User
     public required string Email { get; set; }
     public required string PasswordHash { get; set; }
     public string? Phone { get; set; }
+    public string? Address { get; set; }
+    public DateTime? DateOfBirth { get; set; }
+    public Gender? Gender { get; set; }
     public UserRole Role { get; set; } = UserRole.Customer;
     public bool IsActive { get; set; } = true;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

@@ -19,7 +19,16 @@ const strengthColor = ['bg-red-400', 'bg-orange-400', 'bg-amber-400', 'bg-lime-4
 
 export default function RegisterPage() {
   const navigate = useNavigate();
-  const [form, setForm] = useState({ fullName: '', email: '', phone: '', password: '', confirmPassword: '' });
+  const [form, setForm] = useState({
+    fullName: '',
+    email: '',
+    phone: '',
+    address: '',
+    dateOfBirth: '',
+    gender: '',
+    password: '',
+    confirmPassword: '',
+  });
   const [showPass, setShowPass] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [error, setError] = useState('');
@@ -57,6 +66,9 @@ export default function RegisterPage() {
         email: form.email.trim(),
         password: form.password,
         phone: form.phone.trim() || null,
+        address: form.address.trim() || null,
+        dateOfBirth: form.dateOfBirth || null,
+        gender: form.gender || null,
       });
       navigate('/login');
     } catch (err) {
@@ -107,6 +119,33 @@ export default function RegisterPage() {
             <Input label="Họ và tên" value={form.fullName} onChange={set('fullName')} error={fieldErrors.fullName} placeholder="Nguyễn Văn A" required />
             <Input label="Email" type="email" value={form.email} onChange={set('email')} error={fieldErrors.email} placeholder="email@example.com" required />
             <Input label="Số điện thoại" value={form.phone} onChange={set('phone')} placeholder="09xxxxxxxx" hint="Không bắt buộc" />
+            <Input
+              label="Địa chỉ"
+              value={form.address}
+              onChange={set('address')}
+              placeholder="Số nhà, đường, quận/huyện, tỉnh/thành"
+            />
+            <div className="grid sm:grid-cols-2 gap-3">
+              <Input
+                label="Ngày sinh"
+                type="date"
+                value={form.dateOfBirth}
+                onChange={set('dateOfBirth')}
+              />
+              <div>
+                <label className="label">Giới tính</label>
+                <select
+                  className="input"
+                  value={form.gender}
+                  onChange={(e) => setForm({ ...form, gender: e.target.value })}
+                >
+                  <option value="">-- Chọn --</option>
+                  <option value="Male">Nam</option>
+                  <option value="Female">Nữ</option>
+                  <option value="Other">Khác</option>
+                </select>
+              </div>
+            </div>
 
             <div className="relative">
               <Input label="Mật khẩu" type={showPass ? 'text' : 'password'} value={form.password}

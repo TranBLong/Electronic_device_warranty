@@ -37,6 +37,7 @@ public class AppDbContext : DbContext
             entity.Property(user => user.Email).HasMaxLength(256).IsRequired();
             entity.Property(user => user.PasswordHash).HasMaxLength(100).IsRequired();
             entity.Property(user => user.Phone).HasMaxLength(30);
+            entity.Property(user => user.Address).HasMaxLength(300);
             entity.Property(user => user.Role).HasConversion<string>().HasMaxLength(30);
             entity.HasIndex(user => user.Email).IsUnique();
             entity.HasOne(user => user.ServiceCenter).WithMany(center => center.Staff)

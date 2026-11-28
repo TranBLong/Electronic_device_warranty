@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Warranty.Enums;
 
 namespace Warranty.Dtos;
 
@@ -15,6 +16,14 @@ public sealed class RegisterRequest
 
     [StringLength(30)]
     public string? Phone { get; init; }
+
+    [StringLength(300)]
+    public string? Address { get; init; }
+
+    public DateTime? DateOfBirth { get; init; }
+
+    [EnumDataType(typeof(Gender))]
+    public Gender? Gender { get; init; }
 }
 
 public sealed class LoginRequest

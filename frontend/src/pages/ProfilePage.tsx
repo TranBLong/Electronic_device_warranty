@@ -1,6 +1,7 @@
 import { FormEvent, useState } from 'react';
 import { api, getErrorMessage } from '../api/client';
 import { useAuthStore } from '../store/authStore';
+import type { Gender } from '../types';
 import { UserCircle, Lock, Shield } from 'lucide-react';
 
 export default function ProfilePage() {
@@ -9,6 +10,9 @@ export default function ProfilePage() {
     fullName: user?.fullName || '',
     email: user?.email || '',
     phone: user?.phone || '',
+    address: user?.address || '',
+    dateOfBirth: user?.dateOfBirth ? user.dateOfBirth.slice(0, 10) : '',
+    gender: (user?.gender || '') as Gender | '',
   });
   const [pwd, setPwd] = useState({ currentPassword: '', newPassword: '', confirm: '' });
   const [message, setMessage] = useState('');
@@ -22,7 +26,13 @@ export default function ProfilePage() {
     setMessage('');
     setLoading(true);
     try {
-      await api.put('/api/users/me', form);
+      await api.put('/api/users/me', {
+        ...form,
+        phone: form.phone.trim() || null,
+        address: form.address.trim() || null,
+        dateOfBirth: form.dateOfBirth || null,
+        gender: form.gender || null,
+      });
       await fetchMe();
       setMessage('Cập nhật hồ sơ thành công.');
     } catch (err) {
@@ -121,6 +131,37 @@ export default function ProfilePage() {
               value={form.phone || ''}
               onChange={(e) => setForm({ ...form, phone: e.target.value })}
             />
+          </div>
+          <div className="sm:col-span-2">
+            <label className="label">Địa chỉ</label>
+            <input
+              className="input"
+              value={form.address}
+              onChange={(e) => setForm({ ...form, address: e.target.value })}
+              placeholder="Số nhà, đường, quận/huyện, tỉnh/thành"
+            />
+          </div>
+          <div>
+            <label className="label">Ngày sinh</label>
+            <input
+              className="input"
+              type="date"
+              value={form.dateOfBirth}
+              onChange={(e) => setForm({ ...form, dateOfBirth: e.target.value })}
+            />
+          </div>
+          <div>
+            <label className="label">Giới tính</label>
+            <select
+              className="input"
+              value={form.gender}
+              onChange={(e) => setForm({ ...form, gender: e.target.value as Gender | '' })}
+            >
+              <option value="">-- Chọn --</option>
+              <option value="Male">Nam</option>
+              <option value="Female">Nữ</option>
+              <option value="Other">Khác</option>
+            </select>
           </div>
         </div>
         <button type="submit" className="btn-primary" disabled={loading}>

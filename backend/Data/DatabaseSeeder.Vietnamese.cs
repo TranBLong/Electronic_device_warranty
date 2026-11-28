@@ -157,10 +157,33 @@ public static partial class DatabaseSeeder
         {
             var fullNames = new[]
             {
-                "Nguyen Van Hung", "Tran Thi Mai", "Le Minh Tuan", "Pham Thi Lan", "Hoang Van Nam",
-                "Vu Thi Huong", "Dang Quoc Bao", "Bui Thi Ngoc", "Do Van Khoa", "Ngo Thi Thu",
-                "Duong Minh Duc", "Ly Thi Ha", "Truong Van Phuc", "Phan Thi Yen", "Vo Minh Hai",
-                "Huynh Thi Trang", "Cao Van Long", "Lam Thi Phuong", "To Minh Quan", "Dinh Thi Oanh"
+                "Nguyễn Văn Hùng", "Trần Thị Mai", "Lê Minh Tuấn", "Phạm Thị Lan", "Hoàng Văn Nam",
+                "Vũ Thị Hương", "Đặng Quốc Bảo", "Bùi Thị Ngọc", "Đỗ Văn Khoa", "Ngô Thị Thu",
+                "Dương Minh Đức", "Lý Thị Hà", "Trương Văn Phúc", "Phan Thị Yến", "Võ Minh Hải",
+                "Huỳnh Thị Trang", "Cao Văn Long", "Lâm Thị Phương", "Tô Minh Quân", "Đinh Thị Oanh"
+            };
+            var sampleAddresses = new[]
+            {
+                "18 Trần Duy Hưng, Cầu Giấy, Hà Nội",
+                "45 Nguyễn Văn Cừ, Long Biên, Hà Nội",
+                "72 Nguyễn Huệ, Quận 1, TP. Hồ Chí Minh",
+                "128 Hoàng Văn Thụ, Tân Bình, TP. Hồ Chí Minh",
+                "254 Nguyễn Văn Linh, Thanh Khê, Đà Nẵng",
+                "12 Lê Lợi, Phú Hội, Huế",
+                "35 Mậu Thân, Ninh Kiều, Cần Thơ",
+                "88 Lạch Tray, Ngô Quyền, Hải Phòng",
+                "15 Trần Phú, Lộc Thọ, Nha Trang",
+                "220 Phạm Văn Thuận, Biên Hòa, Đồng Nai",
+                "56 Hoàng Hoa Thám, Vũng Tàu",
+                "12 Nguyễn Tất Thành, Buôn Ma Thuột",
+                "78 Lê Hồng Phong, Quy Nhơn",
+                "33 Nguyễn Sỹ Sách, Vinh, Nghệ An",
+                "19 Hoàng Văn Thụ, Thái Nguyên",
+                "101 Võ Thị Sáu, Quận 3, TP. Hồ Chí Minh",
+                "66 Nguyễn Trãi, Thanh Xuân, Hà Nội",
+                "29 Điện Biên Phủ, Bình Thạnh, TP. Hồ Chí Minh",
+                "8 Bạch Đằng, Hải Châu, Đà Nẵng",
+                "142 Cách Mạng Tháng Tám, Cần Thơ"
             };
             var passwordHash = PasswordHashing.Hash("Customer@123");
             var customers = new List<User>();
@@ -176,6 +199,9 @@ public static partial class DatabaseSeeder
                     Email = customerEmails[i],
                     PasswordHash = passwordHash,
                     Phone = $"09{rng.Next(10000000, 99999999)}",
+                    Address = sampleAddresses[i],
+                    DateOfBirth = new DateTime(1980 + i, 1 + i % 12, 1 + i % 27),
+                    Gender = i % 2 == 0 ? Gender.Male : Gender.Female,
                     Role = UserRole.Customer,
                     IsActive = true,
                     CreatedAt = now.AddDays(-rng.Next(10, 201))

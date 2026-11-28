@@ -55,15 +55,26 @@ public sealed class WarrantyApiTests
         {
             FullName = "Customer One",
             Email = "PERSON@EXAMPLE.COM",
-            Password = "StrongPassword123"
+            Password = "StrongPassword123",
+            Address = "12 Nguyễn Huệ, Quận 1, TP. Hồ Chí Minh",
+            DateOfBirth = new DateTime(1995, 3, 8),
+            Gender = Gender.Female
         }, CancellationToken.None);
 
-        Assert.IsType<CreatedResult>(result.Result);
+        var createdResult = Assert.IsType<CreatedResult>(result.Result);
         var savedUser = await testDatabase.Context.Users.SingleAsync();
         Assert.Equal(UserRole.Customer, savedUser.Role);
         Assert.Equal("person@example.com", savedUser.Email);
         Assert.NotEqual("StrongPassword123", savedUser.PasswordHash);
         Assert.True(BCrypt.Net.BCrypt.Verify("StrongPassword123", savedUser.PasswordHash));
+        Assert.Equal("12 Nguyễn Huệ, Quận 1, TP. Hồ Chí Minh", savedUser.Address);
+        Assert.Equal(new DateTime(1995, 3, 8), savedUser.DateOfBirth);
+        Assert.Equal(Gender.Female, savedUser.Gender);
+
+        var response = Assert.IsType<UserResponse>(createdResult.Value);
+        Assert.Equal(savedUser.Address, response.Address);
+        Assert.Equal(savedUser.DateOfBirth, response.DateOfBirth);
+        Assert.Equal(savedUser.Gender, response.Gender);
     }
 
     [Fact]
@@ -96,12 +107,18 @@ public sealed class WarrantyApiTests
         {
             FullName = "Updated Technician",
             Email = "updated@example.com",
-            Phone = "555-0100"
+            Phone = "555-0100",
+            Address = "45 Lê Lợi, Quận 1, TP. Hồ Chí Minh",
+            DateOfBirth = new DateTime(1990, 8, 20),
+            Gender = Gender.Male
         }, CancellationToken.None);
 
         var savedUser = await testDatabase.Context.Users.SingleAsync();
         Assert.Equal("Updated Technician", savedUser.FullName);
         Assert.Equal("updated@example.com", savedUser.Email);
+        Assert.Equal("45 Lê Lợi, Quận 1, TP. Hồ Chí Minh", savedUser.Address);
+        Assert.Equal(new DateTime(1990, 8, 20), savedUser.DateOfBirth);
+        Assert.Equal(Gender.Male, savedUser.Gender);
         Assert.Equal(UserRole.Technician, savedUser.Role);
         Assert.True(savedUser.IsActive);
     }

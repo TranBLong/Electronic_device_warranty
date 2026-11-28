@@ -13,6 +13,9 @@ function mapUser(d: any): User {
     fullName: d.fullName ?? d.FullName,
     email: d.email ?? d.Email,
     phone: d.phone ?? d.Phone,
+    address: d.address ?? d.Address ?? null,
+    dateOfBirth: d.dateOfBirth ?? d.DateOfBirth ?? null,
+    gender: d.gender ?? d.Gender ?? null,
     role: d.role ?? d.Role,
     isActive: d.isActive ?? d.IsActive,
     createdAt: d.createdAt ?? d.CreatedAt,
@@ -34,6 +37,9 @@ const emptyForm = {
   email: '',
   password: '',
   phone: '',
+  address: '',
+  dateOfBirth: '',
+  gender: '',
   role: 'Customer' as UserRole,
   isActive: true,
 };
@@ -119,6 +125,9 @@ export default function UsersPage() {
       email: u.email,
       password: '',
       phone: u.phone || '',
+      address: u.address || '',
+      dateOfBirth: u.dateOfBirth ? String(u.dateOfBirth).slice(0, 10) : '',
+      gender: u.gender || '',
       role: u.role,
       isActive: u.isActive,
     });
@@ -136,6 +145,9 @@ export default function UsersPage() {
           fullName: form.fullName.trim(),
           email: form.email.trim(),
           phone: form.phone.trim() || null,
+          address: form.address.trim() || null,
+          dateOfBirth: form.dateOfBirth || null,
+          gender: form.gender || null,
           role: form.role,
           isActive: form.isActive,
           newPassword: form.password.trim() || null,
@@ -151,6 +163,9 @@ export default function UsersPage() {
           email: form.email.trim(),
           password: form.password,
           phone: form.phone.trim() || null,
+          address: form.address.trim() || null,
+          dateOfBirth: form.dateOfBirth || null,
+          gender: form.gender || null,
           role: form.role,
           isActive: form.isActive,
         });
@@ -364,6 +379,38 @@ export default function UsersPage() {
                 value={form.phone}
                 onChange={(e) => setForm({ ...form, phone: e.target.value })}
               />
+            </div>
+            <div>
+              <label className="label">Địa chỉ</label>
+              <input
+                className="input"
+                value={form.address}
+                onChange={(e) => setForm({ ...form, address: e.target.value })}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="label">Ngày sinh</label>
+                <input
+                  className="input"
+                  type="date"
+                  value={form.dateOfBirth}
+                  onChange={(e) => setForm({ ...form, dateOfBirth: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="label">Giới tính</label>
+                <select
+                  className="input"
+                  value={form.gender}
+                  onChange={(e) => setForm({ ...form, gender: e.target.value })}
+                >
+                  <option value="">-- Chọn --</option>
+                  <option value="Male">Nam</option>
+                  <option value="Female">Nữ</option>
+                  <option value="Other">Khác</option>
+                </select>
+              </div>
             </div>
             <div>
               <label className="label">Vai trò</label>

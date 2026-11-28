@@ -21,50 +21,65 @@ public static partial class DatabaseSeeder
         {
             new User
             {
-                FullName = "Nguyen Van An",
+                FullName = "Nguyễn Văn An",
                 Email = "admin@warranty.local",
                 PasswordHash = PasswordHashing.Hash("Admin@123"),
                 Phone = "0901000001",
+                Address = "12 Nguyễn Huệ, Quận 1, TP. Hồ Chí Minh",
+                DateOfBirth = new DateTime(1988, 5, 12),
+                Gender = Gender.Male,
                 Role = UserRole.Admin,
                 IsActive = true,
                 CreatedAt = new DateTime(2024, 01, 15, 08, 30, 00, DateTimeKind.Utc)
             },
             new User
             {
-                FullName = "Tran Thi Binh",
+                FullName = "Trần Thị Bình",
                 Email = "manager@warranty.local",
                 PasswordHash = PasswordHashing.Hash("Manager@123"),
                 Phone = "0901000002",
+                Address = "45 Lê Lợi, Quận 1, TP. Hồ Chí Minh",
+                DateOfBirth = new DateTime(1990, 8, 20),
+                Gender = Gender.Female,
                 Role = UserRole.Manager,
                 IsActive = true,
                 CreatedAt = new DateTime(2024, 01, 20, 09, 00, 00, DateTimeKind.Utc)
             },
             new User
             {
-                FullName = "Le Hoai Chi",
+                FullName = "Lê Hoài Chi",
                 Email = "reception@warranty.local",
                 PasswordHash = PasswordHashing.Hash("Receptionist@123"),
                 Phone = "0901000003",
+                Address = "88 Trần Hưng Đạo, Quận 5, TP. Hồ Chí Minh",
+                DateOfBirth = new DateTime(1995, 3, 8),
+                Gender = Gender.Female,
                 Role = UserRole.Receptionist,
                 IsActive = true,
                 CreatedAt = new DateTime(2024, 02, 03, 08, 15, 00, DateTimeKind.Utc)
             },
             new User
             {
-                FullName = "Pham Van Duy",
+                FullName = "Phạm Văn Duy",
                 Email = "tech01@warranty.local",
                 PasswordHash = PasswordHashing.Hash("Technician@123"),
                 Phone = "0901000004",
+                Address = "156 Nguyễn Văn Cừ, Quận 5, TP. Hồ Chí Minh",
+                DateOfBirth = new DateTime(1992, 11, 25),
+                Gender = Gender.Male,
                 Role = UserRole.Technician,
                 IsActive = true,
                 CreatedAt = new DateTime(2024, 02, 10, 07, 45, 00, DateTimeKind.Utc)
             },
             new User
             {
-                FullName = "Nguyen Thi Emy",
+                FullName = "Nguyễn Thị Em",
                 Email = "customer01@warranty.local",
                 PasswordHash = PasswordHashing.Hash("Customer@123"),
                 Phone = "0901000005",
+                Address = "27 Võ Văn Tần, Quận 3, TP. Hồ Chí Minh",
+                DateOfBirth = new DateTime(1998, 7, 3),
+                Gender = Gender.Female,
                 Role = UserRole.Customer,
                 IsActive = true,
                 CreatedAt = new DateTime(2024, 03, 08, 14, 20, 00, DateTimeKind.Utc)

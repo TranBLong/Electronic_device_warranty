@@ -42,6 +42,9 @@ public sealed class UsersController(AppDbContext dbContext) : ControllerBase
         user.FullName = request.FullName.Trim();
         user.Email = NormalizeEmail(request.Email);
         user.Phone = request.Phone?.Trim();
+        user.Address = request.Address?.Trim();
+        user.DateOfBirth = request.DateOfBirth;
+        user.Gender = request.Gender;
 
         try
         {
@@ -78,7 +81,8 @@ public sealed class UsersController(AppDbContext dbContext) : ControllerBase
             .Where(user => user.Role == UserRole.Customer && user.IsActive)
             .OrderBy(user => user.FullName)
             .Select(user => new UserResponse(
-                user.Id, user.FullName, user.Email, user.Phone, user.Role, user.IsActive, user.CreatedAt))
+                user.Id, user.FullName, user.Email, user.Phone,
+                user.Address, user.DateOfBirth, user.Gender, user.Role, user.IsActive, user.CreatedAt))
             .ToListAsync(cancellationToken);
         return Ok(users);
     }
@@ -91,7 +95,8 @@ public sealed class UsersController(AppDbContext dbContext) : ControllerBase
             .Where(user => user.Role == UserRole.Technician && user.IsActive)
             .OrderBy(user => user.FullName)
             .Select(user => new UserResponse(
-                user.Id, user.FullName, user.Email, user.Phone, user.Role, user.IsActive, user.CreatedAt))
+                user.Id, user.FullName, user.Email, user.Phone,
+                user.Address, user.DateOfBirth, user.Gender, user.Role, user.IsActive, user.CreatedAt))
             .ToListAsync(cancellationToken);
         return Ok(users);
     }
@@ -128,7 +133,8 @@ public sealed class UsersController(AppDbContext dbContext) : ControllerBase
         var total = await q.CountAsync(cancellationToken);
         var items = await q.Skip(query.Skip).Take(query.Take)
             .Select(user => new UserResponse(
-                user.Id, user.FullName, user.Email, user.Phone, user.Role, user.IsActive, user.CreatedAt))
+                user.Id, user.FullName, user.Email, user.Phone,
+                user.Address, user.DateOfBirth, user.Gender, user.Role, user.IsActive, user.CreatedAt))
             .ToListAsync(cancellationToken);
         return Ok(PagedResult<UserResponse>.Create(items, query.PageNumber, query.Take, total));
     }
@@ -170,6 +176,9 @@ public sealed class UsersController(AppDbContext dbContext) : ControllerBase
             Email = email,
             PasswordHash = PasswordHashing.Hash(request.Password),
             Phone = request.Phone?.Trim(),
+            Address = request.Address?.Trim(),
+            DateOfBirth = request.DateOfBirth,
+            Gender = request.Gender,
             Role = request.Role.Value,
             IsActive = request.IsActive
         };
@@ -221,6 +230,9 @@ public sealed class UsersController(AppDbContext dbContext) : ControllerBase
         user.FullName = request.FullName.Trim();
         user.Email = email;
         user.Phone = request.Phone?.Trim();
+        user.Address = request.Address?.Trim();
+        user.DateOfBirth = request.DateOfBirth;
+        user.Gender = request.Gender;
         user.Role = request.Role.Value;
         user.IsActive = request.IsActive;
         if (!string.IsNullOrWhiteSpace(request.NewPassword))
@@ -297,6 +309,9 @@ private static UserResponse ToResponse(User user) => new(
         user.FullName,
         user.Email,
         user.Phone,
+        user.Address,
+        user.DateOfBirth,
+        user.Gender,
         user.Role,
         user.IsActive,
         user.CreatedAt);
