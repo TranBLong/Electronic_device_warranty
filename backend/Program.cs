@@ -59,6 +59,7 @@ builder.Services.AddSwaggerGen(options =>
 
 builder.Services.AddSingleton<TokenService>();
 builder.Services.AddScoped<RepairRequestAttachmentService>();
+builder.Services.AddScoped<UserAvatarService>();
 builder.Services.AddScoped<NotificationService>();
 builder.Services.AddHostedService<WarrantyExpiryBackgroundService>();
 
@@ -128,6 +129,18 @@ if (!app.Environment.IsDevelopment())
     app.UseHttpsRedirection();
 
 app.UseCors("Frontend");
+app.UseStaticFiles();
+
+var uploadRoot = Path.IsPathRooted(app.Configuration["Upload:RootPath"] ?? "App_Data/uploads")
+    ? app.Configuration["Upload:RootPath"]!
+    : Path.Combine(app.Environment.ContentRootPath, app.Configuration["Upload:RootPath"] ?? "App_Data/uploads");
+Directory.CreateDirectory(uploadRoot);
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(uploadRoot),
+    RequestPath = "/uploads"
+});
+
 app.UseAuthentication();
 app.UseMiddleware<Warranty.Middlewares.ActiveUserMiddleware>();
 app.UseAuthorization();

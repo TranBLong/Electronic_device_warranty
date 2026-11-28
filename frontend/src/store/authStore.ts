@@ -67,6 +67,7 @@ export const useAuthStore = create<AuthState>()(
             role: (data as any).role ?? (data as any).Role,
             isActive: (data as any).isActive ?? (data as any).IsActive,
             createdAt: (data as any).createdAt ?? (data as any).CreatedAt,
+            avatarUrl: (data as any).avatarUrl ?? (data as any).AvatarUrl ?? '/default-avatar.svg',
           };
           set({ user });
           return user;

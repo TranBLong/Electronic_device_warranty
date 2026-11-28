@@ -2,7 +2,7 @@ import { FormEvent, useState } from 'react';
 import { api, getErrorMessage } from '../api/client';
 import { useAuthStore } from '../store/authStore';
 import type { Gender } from '../types';
-import { UserCircle, Lock, Shield } from 'lucide-react';
+import { UserCircle, Lock, Shield, Camera, Trash2 } from 'lucide-react';
 
 export default function ProfilePage() {
   const { user, fetchMe } = useAuthStore();
@@ -19,6 +19,44 @@ export default function ProfilePage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [pwdLoading, setPwdLoading] = useState(false);
+  const [avatarLoading, setAvatarLoading] = useState(false);
+
+  const onAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setError('');
+    setMessage('');
+    setAvatarLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      await api.post('/api/users/me/avatar', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      await fetchMe();
+      setMessage('Cập nhật ảnh đại diện thành công.');
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setAvatarLoading(false);
+      e.target.value = '';
+    }
+  };
+
+  const onRemoveAvatar = async () => {
+    setError('');
+    setMessage('');
+    setAvatarLoading(true);
+    try {
+      await api.delete('/api/users/me/avatar');
+      await fetchMe();
+      setMessage('Đã xóa ảnh đại diện.');
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setAvatarLoading(false);
+    }
+  };
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -73,15 +111,48 @@ export default function ProfilePage() {
     <div className="space-y-6 max-w-2xl">
       <div className="rounded-2xl bg-gradient-to-r from-indigo-600 via-violet-600 to-purple-600 p-6 text-white shadow-lg">
         <div className="flex items-center gap-4">
-          <div className="rounded-full bg-white/20 p-4">
-            <UserCircle size={40} />
+          <div className="relative shrink-0">
+            {user?.avatarUrl ? (
+              <img
+                src={user.avatarUrl}
+                alt="Ảnh đại diện"
+                className="h-20 w-20 rounded-full object-cover border-2 border-white/40 bg-slate-200"
+              />
+            ) : (
+              <div className="rounded-full bg-white/20 p-4">
+                <UserCircle size={40} />
+              </div>
+            )}
+            <label
+              className="absolute bottom-0 right-0 cursor-pointer rounded-full bg-white p-2 text-indigo-700 shadow-lg"
+              title="Thay ảnh đại diện"
+            >
+              <Camera size={14} />
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                className="hidden"
+                onChange={onAvatarChange}
+                disabled={avatarLoading}
+              />
+            </label>
           </div>
-          <div>
+          <div className="flex-1">
             <h2 className="text-2xl font-bold">{user?.fullName || 'Hồ sơ'}</h2>
             <p className="text-indigo-100 text-sm mt-0.5">
               {user?.email} · <span className="font-medium">{user?.role}</span>
             </p>
           </div>
+          {user?.avatarUrl && !user.avatarUrl.endsWith('/default-avatar.svg') && (
+            <button
+              type="button"
+              onClick={onRemoveAvatar}
+              disabled={avatarLoading}
+              className="flex items-center gap-1 rounded-lg bg-white/15 px-3 py-2 text-xs font-medium hover:bg-white/25 disabled:opacity-50"
+            >
+              <Trash2 size={14} /> Xóa ảnh
+            </button>
+          )}
         </div>
       </div>
 

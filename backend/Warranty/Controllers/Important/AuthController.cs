@@ -152,7 +152,7 @@ public sealed class AuthController(
     private static bool IsUniqueConstraintViolation(DbUpdateException exception) =>
         exception.InnerException is SqlException { Number: 2601 or 2627 };
 
-    private static UserResponse ToResponse(User user) => new(
+    private UserResponse ToResponse(User user) => new(
         user.Id,
         user.FullName,
         user.Email,
@@ -162,5 +162,8 @@ public sealed class AuthController(
         user.Gender,
         user.Role,
         user.IsActive,
-        user.CreatedAt);
+        user.CreatedAt,
+        string.IsNullOrWhiteSpace(user.AvatarPath)
+            ? $"{Request.Scheme}://{Request.Host}/default-avatar.svg"
+            : $"{Request.Scheme}://{Request.Host}/uploads/{user.AvatarPath.TrimStart('/')}");
 }

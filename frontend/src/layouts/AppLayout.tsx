@@ -153,9 +153,17 @@ export default function AppLayout() {
 
         <div className="mt-auto shrink-0 p-4 border-t border-slate-800">
           <div className="flex items-center gap-3 mb-3">
-            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-violet-500 flex items-center justify-center text-sm font-bold">
-              {user?.fullName?.charAt(0)?.toUpperCase() || 'U'}
-            </div>
+            {user?.avatarUrl ? (
+              <img
+                src={user.avatarUrl}
+                alt="Ảnh đại diện"
+                className="w-9 h-9 rounded-full object-cover border border-slate-700"
+              />
+            ) : (
+              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-violet-500 flex items-center justify-center text-sm font-bold">
+                {user?.fullName?.charAt(0)?.toUpperCase() || 'U'}
+              </div>
+            )}
             <div className="flex-1 min-w-0">
               <div className="text-sm font-medium truncate">{user?.fullName}</div>
               <span className={clsx('mt-0.5', roleBadge[user?.role || ''] || 'badge-neutral')}>{user?.role}</span>

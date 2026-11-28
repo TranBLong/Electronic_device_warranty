@@ -89,7 +89,8 @@ public sealed record UserResponse(
     Gender? Gender,
     UserRole Role,
     bool IsActive,
-    DateTime CreatedAt);
+    DateTime CreatedAt,
+    string AvatarUrl);
 
 
 public sealed class ChangePasswordRequest

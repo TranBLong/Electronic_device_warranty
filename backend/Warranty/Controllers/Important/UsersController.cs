@@ -80,11 +80,8 @@ public sealed class UsersController(AppDbContext dbContext) : ControllerBase
         var users = await dbContext.Users.AsNoTracking()
             .Where(user => user.Role == UserRole.Customer && user.IsActive)
             .OrderBy(user => user.FullName)
-            .Select(user => new UserResponse(
-                user.Id, user.FullName, user.Email, user.Phone,
-                user.Address, user.DateOfBirth, user.Gender, user.Role, user.IsActive, user.CreatedAt))
             .ToListAsync(cancellationToken);
-        return Ok(users);
+        return Ok(users.Select(ToResponse).ToList());
     }
 
     [Authorize(Policy = Policies.Staff)]
@@ -94,11 +91,8 @@ public sealed class UsersController(AppDbContext dbContext) : ControllerBase
         var users = await dbContext.Users.AsNoTracking()
             .Where(user => user.Role == UserRole.Technician && user.IsActive)
             .OrderBy(user => user.FullName)
-            .Select(user => new UserResponse(
-                user.Id, user.FullName, user.Email, user.Phone,
-                user.Address, user.DateOfBirth, user.Gender, user.Role, user.IsActive, user.CreatedAt))
             .ToListAsync(cancellationToken);
-        return Ok(users);
+        return Ok(users.Select(ToResponse).ToList());
     }
 
     [Authorize(Policy = Policies.CanManageUsers)]
@@ -132,11 +126,9 @@ public sealed class UsersController(AppDbContext dbContext) : ControllerBase
 
         var total = await q.CountAsync(cancellationToken);
         var items = await q.Skip(query.Skip).Take(query.Take)
-            .Select(user => new UserResponse(
-                user.Id, user.FullName, user.Email, user.Phone,
-                user.Address, user.DateOfBirth, user.Gender, user.Role, user.IsActive, user.CreatedAt))
             .ToListAsync(cancellationToken);
-        return Ok(PagedResult<UserResponse>.Create(items, query.PageNumber, query.Take, total));
+        var responses = items.Select(ToResponse).ToList();
+        return Ok(PagedResult<UserResponse>.Create(responses, query.PageNumber, query.Take, total));
     }
 
     [Authorize(Roles = nameof(UserRole.Admin))]
@@ -304,7 +296,58 @@ public sealed class UsersController(AppDbContext dbContext) : ControllerBase
         return NoContent();
     }
 
-private static UserResponse ToResponse(User user) => new(
+    [HttpPost("me/avatar")]
+    [RequestSizeLimit(10 * 1024 * 1024)]
+    public async Task<ActionResult<UserResponse>> UploadMyAvatar(
+        IFormFile file,
+        [FromServices] UserAvatarService avatarService,
+        CancellationToken cancellationToken)
+    {
+        if (!User.TryGetUserId(out var userId))
+            return Unauthorized();
+        if (file is null || file.Length == 0)
+            return BadRequest(new ProblemDetails { Title = "No file uploaded." });
+
+        var user = await dbContext.Users.SingleOrDefaultAsync(
+            candidate => candidate.Id == userId, cancellationToken);
+        if (user is null)
+            return NotFound();
+
+        try
+        {
+            var oldAvatarPath = user.AvatarPath;
+            var relativePath = await avatarService.SaveAsync(userId, file, cancellationToken);
+            user.AvatarPath = relativePath;
+            await dbContext.SaveChangesAsync(cancellationToken);
+            avatarService.DeleteIfExists(oldAvatarPath);
+            return Ok(ToResponse(user));
+        }
+        catch (InvalidOperationException exception)
+        {
+            return BadRequest(new ProblemDetails { Title = exception.Message });
+        }
+    }
+
+    [HttpDelete("me/avatar")]
+    public async Task<ActionResult<UserResponse>> DeleteMyAvatar(
+        [FromServices] UserAvatarService avatarService,
+        CancellationToken cancellationToken)
+    {
+        if (!User.TryGetUserId(out var userId))
+            return Unauthorized();
+
+        var user = await dbContext.Users.SingleOrDefaultAsync(
+            candidate => candidate.Id == userId, cancellationToken);
+        if (user is null)
+            return NotFound();
+
+        avatarService.DeleteIfExists(user.AvatarPath);
+        user.AvatarPath = null;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return Ok(ToResponse(user));
+    }
+
+    private UserResponse ToResponse(User user) => new(
         user.Id,
         user.FullName,
         user.Email,
@@ -314,5 +357,14 @@ private static UserResponse ToResponse(User user) => new(
         user.Gender,
         user.Role,
         user.IsActive,
-        user.CreatedAt);
+        user.CreatedAt,
+        ResolveAvatarUrl(user.AvatarPath));
+
+    private string ResolveAvatarUrl(string? avatarPath)
+    {
+        var baseUrl = $"{Request.Scheme}://{Request.Host}";
+        return string.IsNullOrWhiteSpace(avatarPath)
+            ? $"{baseUrl}/default-avatar.svg"
+            : $"{baseUrl}/uploads/{avatarPath.TrimStart('/')}";
+    }
 }

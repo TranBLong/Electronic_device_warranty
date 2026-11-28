@@ -14,6 +14,7 @@ export interface User {
   role: UserRole;
   isActive: boolean;
   createdAt: string;
+  avatarUrl?: string;
 }
 
 export interface AuthResponse {
