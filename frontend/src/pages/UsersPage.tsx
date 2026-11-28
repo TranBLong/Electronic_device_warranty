@@ -210,35 +210,41 @@ export default function UsersPage() {
 
       {error && <Alert type="error">{error}</Alert>}
 
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1 max-w-md">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            className="input pl-9"
-            placeholder="Tìm tên, email, SĐT…"
-            value={keyword}
-            onChange={(e) => setKeyword(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && searchNow()}
-          />
+      <div className="card p-4">
+        <div className="flex flex-col sm:flex-row sm:items-end gap-3">
+          <div className="relative flex-1 min-w-0">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              className="input pl-9"
+              placeholder="Tìm tên, email, SĐT…"
+              value={keyword}
+              onChange={(e) => setKeyword(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && searchNow()}
+            />
+          </div>
+          <div className="w-full sm:w-44 shrink-0">
+            <select
+              className="input"
+              value={roleFilter}
+              onChange={(e) => {
+                setRoleFilter(e.target.value);
+                setPage(1);
+              }}
+            >
+              <option value="">Tất cả vai trò</option>
+              {roles.map((r) => (
+                <option key={r} value={r}>
+                  {r}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="shrink-0">
+            <Button variant="secondary" className="w-full sm:w-auto" onClick={searchNow} disabled={loading}>
+              {loading ? 'Đang tải…' : 'Tìm kiếm'}
+            </Button>
+          </div>
         </div>
-        <select
-          className="input w-full sm:w-48"
-          value={roleFilter}
-          onChange={(e) => {
-            setRoleFilter(e.target.value);
-            setPage(1);
-          }}
-        >
-          <option value="">Tất cả vai trò</option>
-          {roles.map((r) => (
-            <option key={r} value={r}>
-              {r}
-            </option>
-          ))}
-        </select>
-        <Button variant="secondary" onClick={searchNow} disabled={loading}>
-          {loading ? 'Đang tải…' : 'Tìm kiếm'}
-        </Button>
       </div>
 
       <div className="card overflow-x-auto">

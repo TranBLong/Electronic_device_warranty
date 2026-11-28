@@ -3,6 +3,7 @@ import { api, getErrorMessage } from '../api/client';
 import type { Category } from '../types';
 import { Plus, Pencil, Trash2, FolderOpen, Search } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
+import { Pagination, parsePaged } from '../components/Pagination';
 
 function mapCat(d: any): Category {
   return {
@@ -14,42 +15,55 @@ function mapCat(d: any): Category {
   };
 }
 
-function extractItems(data: any): any[] {
-  if (Array.isArray(data)) return data;
-  if (Array.isArray(data?.items)) return data.items;
-  if (Array.isArray(data?.Items)) return data.Items;
-  return [];
-}
-
 export default function CategoriesPage() {
   const { hasRole } = useAuthStore();
   const canWrite = hasRole('Admin', 'Manager');
   const [items, setItems] = useState<Category[]>([]);
   const [error, setError] = useState('');
   const [keyword, setKeyword] = useState('');
+  const [appliedKeyword, setAppliedKeyword] = useState('');
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const [sortBy, setSortBy] = useState('name');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [modal, setModal] = useState(false);
   const [editing, setEditing] = useState<Category | null>(null);
   const [form, setForm] = useState({ name: '', description: '' });
   const [saving, setSaving] = useState(false);
 
-  const load = async (p = page) => {
+  const load = async (p = page, size = pageSize) => {
     try {
       const { data } = await api.get('/api/categories', {
-        params: { keyword: keyword || undefined, pageNumber: p, pageSize: 12 },
+        params: {
+          keyword: appliedKeyword || undefined,
+          pageNumber: p,
+          pageSize: size,
+          sortBy,
+          sortDir,
+        },
       });
-      setItems(extractItems(data).map(mapCat));
-      setTotalPages(data?.totalPages ?? data?.TotalPages ?? 1);
-      setPage(data?.pageNumber ?? data?.PageNumber ?? p);
+      const parsed = parsePaged(data, mapCat);
+      setItems(parsed.items);
+      setTotalPages(parsed.totalPages);
+      setTotalCount(parsed.totalCount);
+      setPage(parsed.page);
+      setPageSize(parsed.pageSize);
+      setError('');
     } catch (err) {
       setError(getErrorMessage(err));
     }
   };
 
   useEffect(() => {
-    load(1);
-  }, []);
+    load(page, pageSize);
+  }, [page, pageSize, appliedKeyword, sortBy, sortDir]);
+
+  const toggleSortDirection = () => {
+    setSortDir((direction) => direction === 'asc' ? 'desc' : 'asc');
+    setPage(1);
+  };
 
   const openCreate = () => {
     setEditing(null);
@@ -120,19 +134,39 @@ export default function CategoriesPage() {
         <div className="rounded-xl border border-red-200 bg-red-50 text-red-700 text-sm px-4 py-3">{error}</div>
       )}
 
-      <div className="flex gap-2">
-        <div className="relative flex-1 max-w-md">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            className="input pl-9"
-            placeholder="Tìm danh mục…"
-            value={keyword}
-            onChange={(e) => setKeyword(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && load(1)}
-          />
+      <div className="card p-4">
+        <div className="flex flex-col sm:flex-row sm:items-end gap-3">
+          <div className="relative flex-1 min-w-0">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              className="input pl-9"
+              placeholder="Tìm danh mục…"
+              value={keyword}
+              onChange={(e) => setKeyword(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  setAppliedKeyword(keyword.trim());
+                  setPage(1);
+                }
+              }}
+            />
+          </div>
+          <button className="btn-secondary w-full sm:w-auto shrink-0" onClick={() => { setAppliedKeyword(keyword.trim()); setPage(1); }}>
+            Tìm
+          </button>
+          <select
+            className="input w-full sm:w-auto shrink-0"
+            aria-label="Sắp xếp danh mục"
+            value={sortBy}
+            onChange={(e) => { setSortBy(e.target.value); setPage(1); }}
+          >
+            <option value="name">Tên</option>
+            <option value="createdAt">Ngày tạo</option>
+            <option value="id">ID</option>
+          </select>
         </div>
-        <button className="btn-secondary" onClick={() => load(1)}>
-          Tìm
+        <button className="btn-secondary" onClick={toggleSortDirection}>
+          {sortDir === 'asc' ? 'Tăng dần' : 'Giảm dần'}
         </button>
       </div>
 
@@ -172,23 +206,14 @@ export default function CategoriesPage() {
         )}
       </div>
 
-      {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-2">
-          <button className="btn-secondary" disabled={page <= 1} onClick={() => load(page - 1)}>
-            Trước
-          </button>
-          <span className="text-sm text-slate-600">
-            Trang {page}/{totalPages}
-          </span>
-          <button
-            className="btn-secondary"
-            disabled={page >= totalPages}
-            onClick={() => load(page + 1)}
-          >
-            Sau
-          </button>
-        </div>
-      )}
+      <Pagination
+        page={page}
+        totalPages={totalPages}
+        totalCount={totalCount}
+        pageSize={pageSize}
+        onPageChange={setPage}
+        onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
+      />
 
       {modal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">

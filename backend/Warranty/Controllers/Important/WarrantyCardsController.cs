@@ -15,10 +15,8 @@ namespace Warranty.Controllers;
 public sealed class WarrantyCardsController(AppDbContext dbContext) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<IReadOnlyList<WarrantyCardResponse>>> GetAll(
-        [FromQuery] string? search,
-        [FromQuery] string? sortBy,
-        [FromQuery] string? sortDir,
+    public async Task<ActionResult<PagedResult<WarrantyCardResponse>>> GetAll(
+        [FromQuery] QueryParameters query,
         [FromQuery] string? status,
         CancellationToken cancellationToken)
     {
@@ -47,27 +45,41 @@ public sealed class WarrantyCardsController(AppDbContext dbContext) : Controller
             cards = cards.Where(c => c.Status == statusFilter);
         }
 
-        if (!string.IsNullOrWhiteSpace(search))
+        if (query.NormalizedKeyword is { } term)
         {
-            var term = search.Trim().ToLower();
             cards = cards.Where(c =>
                 c.Product.Name.ToLower().Contains(term) ||
                 c.Product.SerialNumber.ToLower().Contains(term) ||
                 c.Customer.FullName.ToLower().Contains(term));
         }
 
-        var desc = string.Equals(sortDir, "desc", StringComparison.OrdinalIgnoreCase);
-        cards = (sortBy?.ToLowerInvariant()) switch
+        cards = (query.SortBy?.ToLowerInvariant()) switch
         {
-            "product" or "productname" => desc ? cards.OrderByDescending(c => c.Product.Name) : cards.OrderBy(c => c.Product.Name),
-            "customer" or "customername" => desc ? cards.OrderByDescending(c => c.Customer.FullName) : cards.OrderBy(c => c.Customer.FullName),
-            "enddate" => desc ? cards.OrderByDescending(c => c.EndDate) : cards.OrderBy(c => c.EndDate),
-            "status" => desc ? cards.OrderByDescending(c => c.Status) : cards.OrderBy(c => c.Status),
-            "id" => desc ? cards.OrderByDescending(c => c.Id) : cards.OrderBy(c => c.Id),
-            _ => desc ? cards.OrderByDescending(c => c.StartDate) : cards.OrderBy(c => c.StartDate)
+            "product" or "productname" => query.IsDescending
+                ? cards.OrderByDescending(c => c.Product.Name).ThenByDescending(c => c.Id)
+                : cards.OrderBy(c => c.Product.Name).ThenBy(c => c.Id),
+            "customer" or "customername" => query.IsDescending
+                ? cards.OrderByDescending(c => c.Customer.FullName).ThenByDescending(c => c.Id)
+                : cards.OrderBy(c => c.Customer.FullName).ThenBy(c => c.Id),
+            "enddate" => query.IsDescending
+                ? cards.OrderByDescending(c => c.EndDate).ThenByDescending(c => c.Id)
+                : cards.OrderBy(c => c.EndDate).ThenBy(c => c.Id),
+            "status" => query.IsDescending
+                ? cards.OrderByDescending(c => c.Status).ThenByDescending(c => c.Id)
+                : cards.OrderBy(c => c.Status).ThenBy(c => c.Id),
+            "id" => query.IsDescending ? cards.OrderByDescending(c => c.Id) : cards.OrderBy(c => c.Id),
+            _ => query.IsDescending
+                ? cards.OrderByDescending(c => c.StartDate).ThenByDescending(c => c.Id)
+                : cards.OrderBy(c => c.StartDate).ThenBy(c => c.Id)
         };
 
-        return Ok(await cards.Select(card => ToResponse(card)).ToListAsync(cancellationToken));
+        var total = await cards.CountAsync(cancellationToken);
+        var items = await cards
+            .Skip(query.Skip)
+            .Take(query.Take)
+            .Select(card => ToResponse(card))
+            .ToListAsync(cancellationToken);
+        return Ok(PagedResult<WarrantyCardResponse>.Create(items, query.PageNumber, query.Take, total));
     }
 
     [HttpGet("{id:int}")]

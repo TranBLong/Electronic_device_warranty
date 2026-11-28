@@ -4,9 +4,9 @@ import { useAuthStore } from '../store/authStore';
 import type { RepairRequest, WarrantyCard, User, RepairRequestStatus, RepairPartLine, Part } from '../types';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
-import { Button, Alert, PageHeader, EmptyState, Select, TextArea } from '../components/ui';
-import { useSort } from '../hooks/useSort';
+import { Button, Alert, PageHeader, EmptyState, Select, TextArea, Input } from '../components/ui';
 import { SortHeader } from '../components/SortHeader';
+import { Pagination, parsePaged } from '../components/Pagination';
 
 function mapReq(d: any): RepairRequest {
   return {
@@ -61,16 +61,38 @@ export default function RepairRequestsPage() {
   const [partLines, setPartLines] = useState<RepairPartLine[]>([]);
   const [allParts, setAllParts] = useState<Part[]>([]);
   const [partForm, setPartForm] = useState({ partId: 0, quantity: 1 });
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const [sortBy, setSortBy] = useState('createdAt');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+  const [keyword, setKeyword] = useState('');
+  const [appliedKeyword, setAppliedKeyword] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
 
-  const load = async () => {
+  const load = async (p = page, size = pageSize) => {
     try {
       const [reqRes, cardRes] = await Promise.all([
-        api.get('/api/repair-requests'),
-        api.get('/api/warranty-cards'),
+        api.get('/api/repair-requests', {
+          params: {
+            pageNumber: p,
+            pageSize: size,
+            keyword: appliedKeyword || undefined,
+            status: statusFilter || undefined,
+            sortBy,
+            sortDir,
+          },
+        }),
+        api.get('/api/warranty-cards', { params: { pageNumber: 1, pageSize: 100 } }),
       ]);
-      setItems((Array.isArray(reqRes.data) ? reqRes.data : []).map(mapReq));
-      setCards(
-        (Array.isArray(cardRes.data) ? cardRes.data : []).map((d: any) => ({
+      const parsed = parsePaged(reqRes.data, mapReq);
+      setItems(parsed.items);
+      setPage(parsed.page);
+      setPageSize(parsed.pageSize);
+      setTotalPages(parsed.totalPages);
+      setTotalCount(parsed.totalCount);
+      setCards(parsePaged(cardRes.data, (d: any) => ({
           id: d.id ?? d.Id,
           productId: d.productId ?? d.ProductId,
           customerId: d.customerId ?? d.CustomerId,
@@ -78,31 +100,35 @@ export default function RepairRequestsPage() {
           startDate: d.startDate ?? d.StartDate,
           endDate: d.endDate ?? d.EndDate,
           productName: d.productName ?? d.ProductName,
-        }))
-      );
+        })).items);
       if (canAssign) {
         try {
           const techRes = await api.get('/api/users/technicians');
-          setTechnicians(
-            (Array.isArray(techRes.data) ? techRes.data : []).map((d: any) => ({
+          setTechnicians(parsePaged(techRes.data, (d: any) => ({
               id: d.id ?? d.Id,
               fullName: d.fullName ?? d.FullName,
               email: d.email ?? d.Email,
               role: d.role ?? d.Role,
               isActive: d.isActive ?? d.IsActive,
               createdAt: d.createdAt ?? d.CreatedAt,
-            }))
-          );
+            })).items);
         } catch { /* ignore */ }
       }
+      setError('');
     } catch (err) {
       setError(getErrorMessage(err));
     }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load(page, pageSize);
+  }, [page, pageSize, sortBy, sortDir, appliedKeyword, statusFilter]);
 
-  const { sorted, sortKey, sortDir, toggle } = useSort(items, 'createdAt', 'desc');
+  const toggleSort = (column: string) => {
+    setSortDir((direction) => sortBy === column ? (direction === 'asc' ? 'desc' : 'asc') : 'asc');
+    setSortBy(column);
+    setPage(1);
+  };
 
   const onCreate = async (e: FormEvent) => {
     e.preventDefault();
@@ -170,7 +196,7 @@ export default function RepairRequestsPage() {
     try {
       const [lines, parts] = await Promise.all([
         api.get(`/api/repair-requests/${id}/parts`),
-        api.get('/api/parts'),
+        api.get('/api/parts', { params: { pageNumber: 1, pageSize: 100 } }),
       ]);
       setPartLines((Array.isArray(lines.data) ? lines.data : []).map((d: any) => ({
         id: d.id ?? d.Id,
@@ -182,7 +208,7 @@ export default function RepairRequestsPage() {
         lineTotal: d.lineTotal ?? d.LineTotal,
         addedAt: d.addedAt ?? d.AddedAt,
       })));
-      setAllParts((Array.isArray(parts.data) ? parts.data : []).map((d: any) => ({
+      setAllParts(parsePaged(parts.data, (d: any) => ({
         id: d.id ?? d.Id,
         code: d.code ?? d.Code,
         name: d.name ?? d.Name,
@@ -190,7 +216,7 @@ export default function RepairRequestsPage() {
         stockQuantity: d.stockQuantity ?? d.StockQuantity,
         isActive: d.isActive ?? d.IsActive,
         createdAt: d.createdAt ?? d.CreatedAt,
-      })));
+      })).items);
     } catch (err) {
       setError(getErrorMessage(err));
     }
@@ -281,21 +307,54 @@ export default function RepairRequestsPage() {
         </div>
       )}
 
+      <div className="card p-4">
+        <div className="flex flex-col sm:flex-row sm:items-end gap-3">
+          <div className="flex-1 min-w-0">
+            <Input
+              label="Tìm kiếm"
+              placeholder="Mô tả, khách hàng hoặc kỹ thuật viên"
+              value={keyword}
+              onChange={(e) => setKeyword(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  setAppliedKeyword(keyword.trim());
+                  setPage(1);
+                }
+              }}
+            />
+          </div>
+          <div className="w-full sm:w-44 shrink-0">
+            <Select
+              label="Trạng thái"
+              value={statusFilter}
+              onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
+              options={[
+                { value: '', label: 'Tất cả' },
+                ...statuses.map((status) => ({ value: status, label: status })),
+              ]}
+            />
+          </div>
+          <div className="shrink-0">
+            <Button className="w-full sm:w-auto" onClick={() => { setAppliedKeyword(keyword.trim()); setPage(1); }}>Tìm</Button>
+          </div>
+        </div>
+      </div>
+
       <div className="card overflow-x-auto">
         <table className="data-table">
           <thead>
             <tr>
-              <SortHeader label="ID" column="id" sortKey={sortKey} sortDir={sortDir} onToggle={toggle} />
-              <SortHeader label="Khách hàng" column="customerName" sortKey={sortKey} sortDir={sortDir} onToggle={toggle} />
-              <SortHeader label="Mô tả" column="description" sortKey={sortKey} sortDir={sortDir} onToggle={toggle} />
-              <SortHeader label="Trạng thái" column="status" sortKey={sortKey} sortDir={sortDir} onToggle={toggle} />
-              <SortHeader label="Kỹ thuật viên" column="technicianName" sortKey={sortKey} sortDir={sortDir} onToggle={toggle} />
-              <SortHeader label="Ngày tạo" column="createdAt" sortKey={sortKey} sortDir={sortDir} onToggle={toggle} />
+              <SortHeader label="ID" column="id" sortKey={sortBy} sortDir={sortDir} onToggle={toggleSort} />
+              <SortHeader label="Khách hàng" column="customer" sortKey={sortBy} sortDir={sortDir} onToggle={toggleSort} />
+              <SortHeader label="Mô tả" column="description" sortKey={sortBy} sortDir={sortDir} onToggle={toggleSort} />
+              <SortHeader label="Trạng thái" column="status" sortKey={sortBy} sortDir={sortDir} onToggle={toggleSort} />
+              <SortHeader label="Kỹ thuật viên" column="technician" sortKey={sortBy} sortDir={sortDir} onToggle={toggleSort} />
+              <SortHeader label="Ngày tạo" column="createdAt" sortKey={sortBy} sortDir={sortDir} onToggle={toggleSort} />
               <th className="px-4 py-3 text-right text-xs font-semibold uppercase">Thao tác</th>
             </tr>
           </thead>
           <tbody>
-            {sorted.map((r) => (
+            {items.map((r) => (
               <tr key={r.id}>
                 <td className="font-medium">#{r.id}</td>
                 <td>{r.customerName || `#${r.customerId}`}</td>
@@ -336,7 +395,15 @@ export default function RepairRequestsPage() {
             ))}
           </tbody>
         </table>
-        {sorted.length === 0 && <EmptyState title="Không có yêu cầu" description="Chưa có yêu cầu sửa chữa nào." />}
+        {items.length === 0 && <EmptyState title="Không có yêu cầu" description="Chưa có yêu cầu sửa chữa nào." />}
+        <Pagination
+          page={page}
+          totalPages={totalPages}
+          totalCount={totalCount}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
+        />
       </div>
 
       {partsFor && (

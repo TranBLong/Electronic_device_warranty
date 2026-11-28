@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Warranty.Data;
+using Warranty.Dtos;
 using Warranty.Enums;
 using Warranty.Models;
 
@@ -14,26 +15,41 @@ public sealed class PartsController(AppDbContext dbContext) : ControllerBase
 {
     [HttpGet]
     [Authorize(Roles = "Admin,Manager,Technician,Receptionist")]
-    public async Task<ActionResult<IReadOnlyList<PartResponse>>> GetAll(
-        [FromQuery] string? search,
+    public async Task<ActionResult<PagedResult<PartResponse>>> GetAll(
+        [FromQuery] QueryParameters query,
         [FromQuery] bool? inStockOnly,
         CancellationToken cancellationToken)
     {
-        var query = dbContext.Parts.AsNoTracking().Where(p => p.IsActive);
-        if (!string.IsNullOrWhiteSpace(search))
-        {
-            var term = search.Trim().ToLower();
-            query = query.Where(p => p.Name.ToLower().Contains(term) || p.Code.ToLower().Contains(term));
-        }
+        var parts = dbContext.Parts.AsNoTracking().Where(p => p.IsActive);
+        if (query.NormalizedKeyword is { } term)
+            parts = parts.Where(p => p.Name.ToLower().Contains(term) || p.Code.ToLower().Contains(term));
         if (inStockOnly == true)
-        {
-            query = query.Where(p => p.StockQuantity > 0);
-        }
+            parts = parts.Where(p => p.StockQuantity > 0);
 
-        var items = await query.OrderBy(p => p.Name)
+        parts = (query.SortBy?.ToLowerInvariant()) switch
+        {
+            "code" => query.IsDescending
+                ? parts.OrderByDescending(p => p.Code).ThenByDescending(p => p.Id)
+                : parts.OrderBy(p => p.Code).ThenBy(p => p.Id),
+            "price" or "unitprice" => query.IsDescending
+                ? parts.OrderByDescending(p => p.UnitPrice).ThenByDescending(p => p.Id)
+                : parts.OrderBy(p => p.UnitPrice).ThenBy(p => p.Id),
+            "stock" or "stockquantity" => query.IsDescending
+                ? parts.OrderByDescending(p => p.StockQuantity).ThenByDescending(p => p.Id)
+                : parts.OrderBy(p => p.StockQuantity).ThenBy(p => p.Id),
+            "created" or "createdat" => query.IsDescending
+                ? parts.OrderByDescending(p => p.CreatedAt).ThenByDescending(p => p.Id)
+                : parts.OrderBy(p => p.CreatedAt).ThenBy(p => p.Id),
+            _ => query.IsDescending
+                ? parts.OrderByDescending(p => p.Name).ThenByDescending(p => p.Id)
+                : parts.OrderBy(p => p.Name).ThenBy(p => p.Id)
+        };
+
+        var total = await parts.CountAsync(cancellationToken);
+        var items = await parts.Skip(query.Skip).Take(query.Take)
             .Select(p => new PartResponse(p.Id, p.Code, p.Name, p.Description, p.UnitPrice, p.StockQuantity, p.IsActive, p.CreatedAt))
             .ToListAsync(cancellationToken);
-        return Ok(items);
+        return Ok(PagedResult<PartResponse>.Create(items, query.PageNumber, query.Take, total));
     }
 
     [HttpGet("{id:int}")]

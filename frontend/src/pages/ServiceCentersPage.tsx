@@ -4,8 +4,8 @@ import { useAuthStore } from '../store/authStore';
 import type { ServiceCenter } from '../types';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
 import { Button, Input, Alert, Modal, PageHeader, EmptyState } from '../components/ui';
-import { useSort } from '../hooks/useSort';
 import { SortHeader } from '../components/SortHeader';
+import { Pagination, parsePaged } from '../components/Pagination';
 
 function map(d: any): ServiceCenter {
   return {
@@ -27,18 +27,47 @@ export default function ServiceCentersPage() {
   const [editing, setEditing] = useState<ServiceCenter | null>(null);
   const [form, setForm] = useState({ name: '', address: '', phone: '' });
   const [saving, setSaving] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const [sortBy, setSortBy] = useState('name');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+  const [keyword, setKeyword] = useState('');
+  const [appliedKeyword, setAppliedKeyword] = useState('');
 
-  const load = async () => {
+  const load = async (p = page, size = pageSize) => {
     try {
-      const { data } = await api.get('/api/service-centers');
-      setItems((Array.isArray(data) ? data : []).map(map));
+      const { data } = await api.get('/api/service-centers', {
+        params: {
+          pageNumber: p,
+          pageSize: size,
+          keyword: appliedKeyword || undefined,
+          sortBy,
+          sortDir,
+        },
+      });
+      const parsed = parsePaged(data, map);
+      setItems(parsed.items);
+      setPage(parsed.page);
+      setPageSize(parsed.pageSize);
+      setTotalPages(parsed.totalPages);
+      setTotalCount(parsed.totalCount);
+      setError('');
     } catch (err) {
       setError(getErrorMessage(err));
     }
   };
 
-  useEffect(() => { load(); }, []);
-  const { sorted, sortKey, sortDir, toggle } = useSort(items, 'name', 'asc');
+  useEffect(() => {
+    load(page, pageSize);
+  }, [page, pageSize, sortBy, sortDir, appliedKeyword]);
+
+  const toggleSort = (column: string) => {
+    setSortDir((direction) => sortBy === column ? (direction === 'asc' ? 'desc' : 'asc') : 'asc');
+    setSortBy(column);
+    setPage(1);
+  };
 
   const openCreate = () => {
     setEditing(null);
@@ -82,19 +111,40 @@ export default function ServiceCentersPage() {
       <PageHeader title="Trung tâm bảo hành" subtitle="Danh sách chi nhánh / service center"
         actions={canWrite ? <Button icon={<Plus size={16} />} onClick={openCreate}>Thêm</Button> : undefined} />
       {error && <div className="mb-4"><Alert type="error">{error}</Alert></div>}
+      <div className="card p-4 mb-4">
+        <div className="flex flex-col sm:flex-row sm:items-end gap-3">
+          <div className="flex-1 min-w-0">
+            <Input
+              label="Tìm kiếm"
+              placeholder="Tên, địa chỉ hoặc số điện thoại"
+              value={keyword}
+              onChange={(e) => setKeyword(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  setAppliedKeyword(keyword.trim());
+                  setPage(1);
+                }
+              }}
+            />
+          </div>
+          <div className="shrink-0">
+            <Button className="w-full sm:w-auto" onClick={() => { setAppliedKeyword(keyword.trim()); setPage(1); }}>Tìm</Button>
+          </div>
+        </div>
+      </div>
       <div className="card overflow-x-auto">
         <table className="data-table">
           <thead>
             <tr>
-              <SortHeader label="Tên" column="name" sortKey={sortKey} sortDir={sortDir} onToggle={toggle} />
-              <SortHeader label="Địa chỉ" column="address" sortKey={sortKey} sortDir={sortDir} onToggle={toggle} />
+              <SortHeader label="Tên" column="name" sortKey={sortBy} sortDir={sortDir} onToggle={toggleSort} />
+              <SortHeader label="Địa chỉ" column="address" sortKey={sortBy} sortDir={sortDir} onToggle={toggleSort} />
               <th className="px-4 py-3 text-xs font-semibold uppercase">SĐT</th>
               <th className="px-4 py-3 text-xs font-semibold uppercase">Trạng thái</th>
               {canWrite && <th className="px-4 py-3 text-right text-xs font-semibold uppercase">Thao tác</th>}
             </tr>
           </thead>
           <tbody>
-            {sorted.map((c) => (
+            {items.map((c) => (
               <tr key={c.id}>
                 <td className="font-medium">{c.name}</td>
                 <td>{c.address}</td>
@@ -110,7 +160,15 @@ export default function ServiceCentersPage() {
             ))}
           </tbody>
         </table>
-        {sorted.length === 0 && <EmptyState title="Chưa có trung tâm" />}
+        {items.length === 0 && <EmptyState title="Chưa có trung tâm" />}
+        <Pagination
+          page={page}
+          totalPages={totalPages}
+          totalCount={totalCount}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
+        />
       </div>
       <Modal open={modal} onClose={() => setModal(false)} title={editing ? 'Sửa trung tâm' : 'Thêm trung tâm'}
         footer={<><Button variant="secondary" onClick={() => setModal(false)}>Hủy</Button><Button loading={saving} onClick={() => onSave()}>Lưu</Button></>}>

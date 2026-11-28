@@ -189,20 +189,24 @@ export default function ProductsPage() {
 
       {error && <Alert type="error">{error}</Alert>}
 
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1 max-w-md">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            className="input pl-9"
-            placeholder="Tìm tên, hãng, serial…"
-            value={keyword}
-            onChange={(e) => setKeyword(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && searchNow()}
-          />
+      <div className="card p-4">
+        <div className="flex flex-col sm:flex-row sm:items-end gap-3">
+          <div className="relative flex-1 min-w-0">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              className="input pl-9"
+              placeholder="Tìm tên, hãng, serial…"
+              value={keyword}
+              onChange={(e) => setKeyword(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && searchNow()}
+            />
+          </div>
+          <div className="shrink-0">
+            <Button variant="secondary" className="w-full sm:w-auto" onClick={searchNow} disabled={loading}>
+              {loading ? 'Đang tải…' : 'Tìm kiếm'}
+            </Button>
+          </div>
         </div>
-        <Button variant="secondary" onClick={searchNow} disabled={loading}>
-          {loading ? 'Đang tải…' : 'Tìm kiếm'}
-        </Button>
       </div>
 
       <div className="card overflow-x-auto">

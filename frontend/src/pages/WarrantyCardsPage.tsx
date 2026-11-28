@@ -5,8 +5,8 @@ import type { WarrantyCard, Product, User } from '../types';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { Button, Alert, PageHeader, EmptyState, Select, Input } from '../components/ui';
-import { useSort } from '../hooks/useSort';
 import { SortHeader } from '../components/SortHeader';
+import { Pagination, parsePaged } from '../components/Pagination';
 
 function mapCard(d: any): WarrantyCard {
   return {
@@ -39,43 +39,85 @@ export default function WarrantyCardsPage() {
   const [form, setForm] = useState({ productId: 0, customerId: 0, startDate: '' });
   const [editId, setEditId] = useState<number | null>(null);
   const [editStatus, setEditStatus] = useState('Active');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const [sortBy, setSortBy] = useState('id');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+  const [keyword, setKeyword] = useState('');
+  const [appliedKeyword, setAppliedKeyword] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
 
-  const load = async () => {
+  const load = async (p = page, size = pageSize) => {
     try {
-      const [cardsRes, prodRes] = await Promise.all([
-        api.get('/api/warranty-cards'),
-        api.get('/api/products'),
-      ]);
-      setItems((Array.isArray(cardsRes.data) ? cardsRes.data : []).map(mapCard));
-      setProducts((Array.isArray(prodRes.data) ? prodRes.data : []).map((d: any) => ({
-        id: d.id ?? d.Id,
-        name: d.name ?? d.Name,
-        brand: d.brand ?? d.Brand,
-        model: d.model ?? d.Model,
-        serialNumber: d.serialNumber ?? d.SerialNumber,
-        warrantyMonths: d.warrantyMonths ?? d.WarrantyMonths,
-        createdAt: d.createdAt ?? d.CreatedAt,
-      })));
-      if (canWrite) {
-        try {
-          const custRes = await api.get('/api/users/customers');
-          setCustomers((Array.isArray(custRes.data) ? custRes.data : []).map((d: any) => ({
-            id: d.id ?? d.Id,
-            fullName: d.fullName ?? d.FullName,
-            email: d.email ?? d.Email,
-            role: d.role ?? d.Role,
-            isActive: d.isActive ?? d.IsActive,
-            createdAt: d.createdAt ?? d.CreatedAt,
-          })));
-        } catch { /* */ }
-      }
+      const { data } = await api.get('/api/warranty-cards', {
+        params: {
+          pageNumber: p,
+          pageSize: size,
+          keyword: appliedKeyword || undefined,
+          status: statusFilter || undefined,
+          sortBy,
+          sortDir,
+        },
+      });
+      const parsed = parsePaged(data, mapCard);
+      setItems(parsed.items);
+      setPage(parsed.page);
+      setPageSize(parsed.pageSize);
+      setTotalPages(parsed.totalPages);
+      setTotalCount(parsed.totalCount);
+      setError('');
     } catch (err) {
       setError(getErrorMessage(err));
     }
   };
 
-  useEffect(() => { load(); }, []);
-  const { sorted, sortKey, sortDir, toggle } = useSort(items, 'id', 'desc');
+  useEffect(() => {
+    load(page, pageSize);
+  }, [page, pageSize, sortBy, sortDir, appliedKeyword, statusFilter]);
+
+  useEffect(() => {
+    const loadOptions = async () => {
+      try {
+        const { data } = await api.get('/api/products', {
+          params: { pageNumber: 1, pageSize: 100 },
+        });
+        setProducts(parsePaged(data, (d: any) => ({
+          id: d.id ?? d.Id,
+          name: d.name ?? d.Name,
+          brand: d.brand ?? d.Brand,
+          model: d.model ?? d.Model,
+          serialNumber: d.serialNumber ?? d.SerialNumber,
+          warrantyMonths: d.warrantyMonths ?? d.WarrantyMonths,
+          createdAt: d.createdAt ?? d.CreatedAt,
+        })).items);
+
+        if (canWrite) {
+          try {
+            const custRes = await api.get('/api/users/customers');
+            setCustomers(parsePaged(custRes.data, (d: any) => ({
+              id: d.id ?? d.Id,
+              fullName: d.fullName ?? d.FullName,
+              email: d.email ?? d.Email,
+              role: d.role ?? d.Role,
+              isActive: d.isActive ?? d.IsActive,
+              createdAt: d.createdAt ?? d.CreatedAt,
+            })).items);
+          } catch { /* */ }
+        }
+      } catch (err) {
+        setError(getErrorMessage(err));
+      }
+    };
+    loadOptions();
+  }, [canWrite]);
+
+  const toggleSort = (column: string) => {
+    setSortDir((direction) => sortBy === column ? (direction === 'asc' ? 'desc' : 'asc') : 'asc');
+    setSortBy(column);
+    setPage(1);
+  };
 
   const onCreate = async (e: FormEvent) => {
     e.preventDefault();
@@ -154,21 +196,56 @@ export default function WarrantyCardsPage() {
         </div>
       )}
 
+      <div className="card p-4">
+        <div className="flex flex-col sm:flex-row sm:items-end gap-3">
+          <div className="flex-1 min-w-0">
+            <Input
+              label="Tìm kiếm"
+              placeholder="Sản phẩm, số serial hoặc khách hàng"
+              value={keyword}
+              onChange={(e) => setKeyword(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  setAppliedKeyword(keyword.trim());
+                  setPage(1);
+                }
+              }}
+            />
+          </div>
+          <div className="w-full sm:w-44 shrink-0">
+            <Select
+              label="Trạng thái"
+              value={statusFilter}
+              onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
+              options={[
+                { value: '', label: 'Tất cả' },
+                { value: 'Active', label: 'Active' },
+                { value: 'Expired', label: 'Expired' },
+                { value: 'Voided', label: 'Voided' },
+              ]}
+            />
+          </div>
+          <div className="shrink-0">
+            <Button className="w-full sm:w-auto" onClick={() => { setAppliedKeyword(keyword.trim()); setPage(1); }}>Tìm</Button>
+          </div>
+        </div>
+      </div>
+
       <div className="card overflow-x-auto">
         <table className="data-table">
           <thead>
             <tr>
-              <SortHeader label="ID" column="id" sortKey={sortKey} sortDir={sortDir} onToggle={toggle} />
-              <SortHeader label="Sản phẩm" column="productName" sortKey={sortKey} sortDir={sortDir} onToggle={toggle} />
-              <SortHeader label="Khách hàng" column="customerName" sortKey={sortKey} sortDir={sortDir} onToggle={toggle} />
-              <SortHeader label="Bắt đầu" column="startDate" sortKey={sortKey} sortDir={sortDir} onToggle={toggle} />
-              <SortHeader label="Kết thúc" column="endDate" sortKey={sortKey} sortDir={sortDir} onToggle={toggle} />
-              <SortHeader label="Trạng thái" column="status" sortKey={sortKey} sortDir={sortDir} onToggle={toggle} />
+              <SortHeader label="ID" column="id" sortKey={sortBy} sortDir={sortDir} onToggle={toggleSort} />
+              <SortHeader label="Sản phẩm" column="productName" sortKey={sortBy} sortDir={sortDir} onToggle={toggleSort} />
+              <SortHeader label="Khách hàng" column="customerName" sortKey={sortBy} sortDir={sortDir} onToggle={toggleSort} />
+              <SortHeader label="Bắt đầu" column="startDate" sortKey={sortBy} sortDir={sortDir} onToggle={toggleSort} />
+              <SortHeader label="Kết thúc" column="endDate" sortKey={sortBy} sortDir={sortDir} onToggle={toggleSort} />
+              <SortHeader label="Trạng thái" column="status" sortKey={sortBy} sortDir={sortDir} onToggle={toggleSort} />
               {canWrite && <th className="px-4 py-3 text-right text-xs font-semibold uppercase">Thao tác</th>}
             </tr>
           </thead>
           <tbody>
-            {sorted.map((c) => (
+            {items.map((c) => (
               <tr key={c.id}>
                 <td>#{c.id}</td>
                 <td>{c.productName || `SP #${c.productId}`}</td>
@@ -186,7 +263,15 @@ export default function WarrantyCardsPage() {
             ))}
           </tbody>
         </table>
-        {sorted.length === 0 && <EmptyState title="Không có phiếu bảo hành" />}
+        {items.length === 0 && <EmptyState title="Không có phiếu bảo hành" />}
+        <Pagination
+          page={page}
+          totalPages={totalPages}
+          totalCount={totalCount}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
+        />
       </div>
     </div>
   );

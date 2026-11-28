@@ -2,7 +2,9 @@ import { FormEvent, useEffect, useState } from 'react';
 import { api, getErrorMessage } from '../api/client';
 import { useAuthStore } from '../store/authStore';
 import type { Part } from '../types';
-import { Plus } from 'lucide-react';
+import { Plus, Search } from 'lucide-react';
+import { Pagination, parsePaged } from '../components/Pagination';
+import { SortHeader } from '../components/SortHeader';
 
 function mapPart(d: any): Part {
   return {
@@ -24,19 +26,49 @@ export default function PartsPage() {
   const [error, setError] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ code: '', name: '', description: '', unitPrice: 0, stockQuantity: 0 });
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const [sortBy, setSortBy] = useState('name');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+  const [keyword, setKeyword] = useState('');
+  const [appliedKeyword, setAppliedKeyword] = useState('');
+  const [inStockOnly, setInStockOnly] = useState(false);
 
-  const load = async () => {
+  const load = async (p = page, size = pageSize) => {
     try {
-      const { data } = await api.get('/api/parts');
-      setItems((Array.isArray(data) ? data : []).map(mapPart));
+      const { data } = await api.get('/api/parts', {
+        params: {
+          pageNumber: p,
+          pageSize: size,
+          keyword: appliedKeyword || undefined,
+          inStockOnly: inStockOnly || undefined,
+          sortBy,
+          sortDir,
+        },
+      });
+      const parsed = parsePaged(data, mapPart);
+      setItems(parsed.items);
+      setPage(parsed.page);
+      setPageSize(parsed.pageSize);
+      setTotalPages(parsed.totalPages);
+      setTotalCount(parsed.totalCount);
+      setError('');
     } catch (err) {
       setError(getErrorMessage(err));
     }
   };
 
   useEffect(() => {
-    load();
-  }, []);
+    load(page, pageSize);
+  }, [page, pageSize, sortBy, sortDir, appliedKeyword, inStockOnly]);
+
+  const toggleSort = (column: string) => {
+    setSortDir((direction) => sortBy === column ? (direction === 'asc' ? 'desc' : 'asc') : 'asc');
+    setSortBy(column);
+    setPage(1);
+  };
 
   const onCreate = async (e: FormEvent) => {
     e.preventDefault();
@@ -63,6 +95,38 @@ export default function PartsPage() {
       </div>
 
       {error && <div className="rounded-lg bg-red-50 text-red-700 text-sm px-3 py-2">{error}</div>}
+
+      <div className="card p-4">
+        <div className="flex flex-col sm:flex-row sm:items-end gap-3">
+          <div className="relative flex-1 min-w-0">
+            <label className="label">Tìm kiếm</label>
+            <Search size={16} className="absolute left-3 top-9 text-slate-400" />
+            <input
+              className="input pl-9"
+              placeholder="Mã hoặc tên linh kiện"
+              value={keyword}
+              onChange={(e) => setKeyword(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  setAppliedKeyword(keyword.trim());
+                  setPage(1);
+                }
+              }}
+            />
+          </div>
+          <label className="flex items-center gap-2 text-sm text-slate-600 pb-2 shrink-0">
+            <input
+              type="checkbox"
+              checked={inStockOnly}
+              onChange={(e) => { setInStockOnly(e.target.checked); setPage(1); }}
+            />
+            Chỉ còn hàng
+          </label>
+          <button className="btn-secondary w-full sm:w-auto shrink-0" onClick={() => { setAppliedKeyword(keyword.trim()); setPage(1); }}>
+            Tìm
+          </button>
+        </div>
+      </div>
 
       {showForm && (
         <form onSubmit={onCreate} className="card p-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -97,10 +161,10 @@ export default function PartsPage() {
         <table className="w-full text-sm">
           <thead className="bg-slate-50 text-slate-600 border-b">
             <tr>
-              <th className="text-left px-4 py-3 font-medium">Mã</th>
-              <th className="text-left px-4 py-3 font-medium">Tên</th>
-              <th className="text-left px-4 py-3 font-medium">Đơn giá</th>
-              <th className="text-left px-4 py-3 font-medium">Tồn kho</th>
+              <SortHeader label="Mã" column="code" sortKey={sortBy} sortDir={sortDir} onToggle={toggleSort} />
+              <SortHeader label="Tên" column="name" sortKey={sortBy} sortDir={sortDir} onToggle={toggleSort} />
+              <SortHeader label="Đơn giá" column="price" sortKey={sortBy} sortDir={sortDir} onToggle={toggleSort} />
+              <SortHeader label="Tồn kho" column="stock" sortKey={sortBy} sortDir={sortDir} onToggle={toggleSort} />
             </tr>
           </thead>
           <tbody className="divide-y">
@@ -119,6 +183,14 @@ export default function PartsPage() {
             )}
           </tbody>
         </table>
+        <Pagination
+          page={page}
+          totalPages={totalPages}
+          totalCount={totalCount}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
+        />
       </div>
     </div>
   );

@@ -15,10 +15,8 @@ namespace Warranty.Controllers;
 public sealed class RepairRequestsController(AppDbContext dbContext) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<IReadOnlyList<RepairRequestResponse>>> GetAll(
-        [FromQuery] string? search,
-        [FromQuery] string? sortBy,
-        [FromQuery] string? sortDir,
+    public async Task<ActionResult<PagedResult<RepairRequestResponse>>> GetAll(
+        [FromQuery] QueryParameters query,
         [FromQuery] string? status,
         CancellationToken cancellationToken)
     {
@@ -50,33 +48,44 @@ public sealed class RepairRequestsController(AppDbContext dbContext) : Controlle
             requests = requests.Where(r => r.Status == statusFilter);
         }
 
-        if (!string.IsNullOrWhiteSpace(search))
+        if (query.NormalizedKeyword is { } term)
         {
-            var term = search.Trim().ToLower();
             requests = requests.Where(r =>
                 r.Description.ToLower().Contains(term) ||
                 r.WarrantyCard.Customer.FullName.ToLower().Contains(term) ||
                 (r.Technician != null && r.Technician.FullName.ToLower().Contains(term)));
         }
 
-        var desc = string.Equals(sortDir, "desc", StringComparison.OrdinalIgnoreCase);
-        requests = (sortBy?.ToLowerInvariant()) switch
+        requests = (query.SortBy?.ToLowerInvariant()) switch
         {
-            "status" => desc ? requests.OrderByDescending(r => r.Status) : requests.OrderBy(r => r.Status),
-            "customer" => desc
-                ? requests.OrderByDescending(r => r.WarrantyCard.Customer.FullName)
-                : requests.OrderBy(r => r.WarrantyCard.Customer.FullName),
-            "technician" => desc
-                ? requests.OrderByDescending(r => r.Technician!.FullName)
-                : requests.OrderBy(r => r.Technician!.FullName),
-            "updated" or "updatedat" => desc
-                ? requests.OrderByDescending(r => r.UpdatedAt)
-                : requests.OrderBy(r => r.UpdatedAt),
-            "id" => desc ? requests.OrderByDescending(r => r.Id) : requests.OrderBy(r => r.Id),
-            _ => desc ? requests.OrderByDescending(r => r.CreatedAt) : requests.OrderBy(r => r.CreatedAt)
+            "status" => query.IsDescending
+                ? requests.OrderByDescending(r => r.Status).ThenByDescending(r => r.Id)
+                : requests.OrderBy(r => r.Status).ThenBy(r => r.Id),
+            "customer" or "customername" => query.IsDescending
+                ? requests.OrderByDescending(r => r.WarrantyCard.Customer.FullName).ThenByDescending(r => r.Id)
+                : requests.OrderBy(r => r.WarrantyCard.Customer.FullName).ThenBy(r => r.Id),
+            "description" => query.IsDescending
+                ? requests.OrderByDescending(r => r.Description).ThenByDescending(r => r.Id)
+                : requests.OrderBy(r => r.Description).ThenBy(r => r.Id),
+            "technician" or "technicianname" => query.IsDescending
+                ? requests.OrderByDescending(r => r.Technician!.FullName).ThenByDescending(r => r.Id)
+                : requests.OrderBy(r => r.Technician!.FullName).ThenBy(r => r.Id),
+            "updated" or "updatedat" => query.IsDescending
+                ? requests.OrderByDescending(r => r.UpdatedAt).ThenByDescending(r => r.Id)
+                : requests.OrderBy(r => r.UpdatedAt).ThenBy(r => r.Id),
+            "id" => query.IsDescending ? requests.OrderByDescending(r => r.Id) : requests.OrderBy(r => r.Id),
+            _ => query.IsDescending
+                ? requests.OrderByDescending(r => r.CreatedAt).ThenByDescending(r => r.Id)
+                : requests.OrderBy(r => r.CreatedAt).ThenBy(r => r.Id)
         };
 
-        return Ok(await requests.Select(request => ToResponse(request)).ToListAsync(cancellationToken));
+        var total = await requests.CountAsync(cancellationToken);
+        var items = await requests
+            .Skip(query.Skip)
+            .Take(query.Take)
+            .Select(request => ToResponse(request))
+            .ToListAsync(cancellationToken);
+        return Ok(PagedResult<RepairRequestResponse>.Create(items, query.PageNumber, query.Take, total));
     }
 
     [HttpGet("{id:int}")]

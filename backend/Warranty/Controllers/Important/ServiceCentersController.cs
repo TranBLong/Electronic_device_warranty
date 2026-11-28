@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Warranty.Data;
+using Warranty.Dtos;
 using Warranty.Enums;
 using Warranty.Models;
 
@@ -13,14 +14,40 @@ namespace Warranty.Controllers;
 public sealed class ServiceCentersController(AppDbContext dbContext) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<IReadOnlyList<ServiceCenterResponse>>> GetAll(CancellationToken cancellationToken)
+    public async Task<ActionResult<PagedResult<ServiceCenterResponse>>> GetAll(
+        [FromQuery] QueryParameters query,
+        CancellationToken cancellationToken)
     {
-        var items = await dbContext.ServiceCenters.AsNoTracking()
-            .Where(c => c.IsActive)
-            .OrderBy(c => c.Name)
+        var centers = dbContext.ServiceCenters.AsNoTracking()
+            .Where(center => center.IsActive)
+            .AsQueryable();
+        if (query.NormalizedKeyword is { } term)
+            centers = centers.Where(center =>
+                center.Name.ToLower().Contains(term) ||
+                center.Address.ToLower().Contains(term) ||
+                (center.Phone != null && center.Phone.ToLower().Contains(term)));
+
+        centers = (query.SortBy?.ToLowerInvariant()) switch
+        {
+            "address" => query.IsDescending
+                ? centers.OrderByDescending(center => center.Address).ThenByDescending(center => center.Id)
+                : centers.OrderBy(center => center.Address).ThenBy(center => center.Id),
+            "created" or "createdat" => query.IsDescending
+                ? centers.OrderByDescending(center => center.CreatedAt).ThenByDescending(center => center.Id)
+                : centers.OrderBy(center => center.CreatedAt).ThenBy(center => center.Id),
+            "id" => query.IsDescending
+                ? centers.OrderByDescending(center => center.Id)
+                : centers.OrderBy(center => center.Id),
+            _ => query.IsDescending
+                ? centers.OrderByDescending(center => center.Name).ThenByDescending(center => center.Id)
+                : centers.OrderBy(center => center.Name).ThenBy(center => center.Id)
+        };
+
+        var total = await centers.CountAsync(cancellationToken);
+        var items = await centers.Skip(query.Skip).Take(query.Take)
             .Select(c => new ServiceCenterResponse(c.Id, c.Name, c.Address, c.Phone, c.IsActive, c.CreatedAt))
             .ToListAsync(cancellationToken);
-        return Ok(items);
+        return Ok(PagedResult<ServiceCenterResponse>.Create(items, query.PageNumber, query.Take, total));
     }
 
     [HttpGet("{id:int}")]

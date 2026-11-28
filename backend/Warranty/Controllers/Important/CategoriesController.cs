@@ -23,7 +23,21 @@ public sealed class CategoriesController(AppDbContext dbContext) : ControllerBas
         if (query.NormalizedKeyword is { } term)
             q = q.Where(c => c.Name.ToLower().Contains(term) ||
                              (c.Description != null && c.Description.ToLower().Contains(term)));
-        q = query.IsDescending ? q.OrderByDescending(c => c.Name) : q.OrderBy(c => c.Name);
+        q = (query.SortBy?.ToLowerInvariant()) switch
+        {
+            "description" => query.IsDescending
+                ? q.OrderByDescending(c => c.Description).ThenByDescending(c => c.Id)
+                : q.OrderBy(c => c.Description).ThenBy(c => c.Id),
+            "created" or "createdat" => query.IsDescending
+                ? q.OrderByDescending(c => c.CreatedAt).ThenByDescending(c => c.Id)
+                : q.OrderBy(c => c.CreatedAt).ThenBy(c => c.Id),
+            "id" => query.IsDescending
+                ? q.OrderByDescending(c => c.Id)
+                : q.OrderBy(c => c.Id),
+            _ => query.IsDescending
+                ? q.OrderByDescending(c => c.Name).ThenByDescending(c => c.Id)
+                : q.OrderBy(c => c.Name).ThenBy(c => c.Id)
+        };
         var total = await q.CountAsync(cancellationToken);
         var items = await q.Skip(query.Skip).Take(query.Take)
             .Select(c => new CategoryResponse(c.Id, c.Name, c.Description, c.IsActive, c.CreatedAt))
