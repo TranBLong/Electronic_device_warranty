@@ -52,3 +52,11 @@ public sealed record DashboardSummaryResponse(
     int ReceivedRepairRequests,
     int InProgressRepairRequests,
     int CompletedRepairRequests);
+
+public sealed record RepairRequestAttachmentResponse(
+    int Id,
+    string FileName,
+    string ContentType,
+    long FileSize,
+    DateTime UploadedAt,
+    int UploadedById);

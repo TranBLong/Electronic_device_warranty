@@ -3,10 +3,13 @@ using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.FileProviders;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Warranty.Controllers;
 using Warranty.Data;
@@ -228,7 +231,9 @@ public sealed class WarrantyApiTests
         };
         testDatabase.Context.WarrantyCards.Add(card);
         await testDatabase.Context.SaveChangesAsync();
-        var controller = WithUser(new RepairRequestsController(testDatabase.Context), customer.Id, UserRole.Customer);
+        var controller = WithUser(
+            new RepairRequestsController(testDatabase.Context, CreateAttachmentService(testDatabase.Context)),
+            customer.Id, UserRole.Customer);
 
         var result = await controller.Create(new CreateRepairRequest
         {
@@ -266,6 +271,113 @@ public sealed class WarrantyApiTests
     }
 
     [Fact]
+    public async Task UploadAttachment_RejectsFilesOverConfiguredSize()
+    {
+        await using var testDatabase = await TestDatabase.CreateAsync();
+        var setup = await CreateAttachmentSetupAsync(testDatabase.Context, 1024);
+        try
+        {
+            var file = CreateFormFile(
+                new byte[1025], "large.jpg", "image/jpeg");
+
+            var result = await setup.Controller.UploadAttachment(
+                setup.Request.Id, file, CancellationToken.None);
+
+            var problem = Assert.IsType<ProblemDetails>(
+                Assert.IsType<BadRequestObjectResult>(result.Result).Value);
+            Assert.Equal(StatusCodes.Status400BadRequest, problem.Status);
+            Assert.Empty(await testDatabase.Context.RepairRequestAttachments.ToListAsync());
+        }
+        finally
+        {
+            Directory.Delete(setup.ContentRoot, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task UploadAttachment_RejectsDisallowedExtension()
+    {
+        await using var testDatabase = await TestDatabase.CreateAsync();
+        var setup = await CreateAttachmentSetupAsync(testDatabase.Context);
+        try
+        {
+            var file = CreateFormFile(
+                [0x25, 0x50, 0x44, 0x46, 0x2D], "document.exe", "application/pdf");
+
+            var result = await setup.Controller.UploadAttachment(
+                setup.Request.Id, file, CancellationToken.None);
+
+            var problem = Assert.IsType<ProblemDetails>(
+                Assert.IsType<BadRequestObjectResult>(result.Result).Value);
+            Assert.Equal(StatusCodes.Status400BadRequest, problem.Status);
+            Assert.Empty(await testDatabase.Context.RepairRequestAttachments.ToListAsync());
+        }
+        finally
+        {
+            Directory.Delete(setup.ContentRoot, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task UploadAttachment_RejectsJpegWithInvalidMagicBytes()
+    {
+        await using var testDatabase = await TestDatabase.CreateAsync();
+        var setup = await CreateAttachmentSetupAsync(testDatabase.Context);
+        try
+        {
+            var file = CreateFormFile(
+                Encoding.UTF8.GetBytes("not a jpeg"), "photo.jpg", "image/jpeg");
+
+            var result = await setup.Controller.UploadAttachment(
+                setup.Request.Id, file, CancellationToken.None);
+
+            Assert.IsType<BadRequestObjectResult>(result.Result);
+            Assert.Empty(await testDatabase.Context.RepairRequestAttachments.ToListAsync());
+        }
+        finally
+        {
+            Directory.Delete(setup.ContentRoot, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task UploadAttachment_SavesValidJpegAndSupportsListingAndDownload()
+    {
+        await using var testDatabase = await TestDatabase.CreateAsync();
+        var setup = await CreateAttachmentSetupAsync(testDatabase.Context);
+        try
+        {
+            var bytes = new byte[] { 0xFF, 0xD8, 0xFF, 0x00, 0x01 };
+            var result = await setup.Controller.UploadAttachment(
+                setup.Request.Id,
+                CreateFormFile(bytes, "photo.jpg", "image/jpeg"),
+                CancellationToken.None);
+
+            var created = Assert.IsType<CreatedAtActionResult>(result.Result);
+            var response = Assert.IsType<RepairRequestAttachmentResponse>(created.Value);
+            Assert.Equal("photo.jpg", response.FileName);
+            Assert.Equal("image/jpeg", response.ContentType);
+            Assert.Equal(bytes.Length, response.FileSize);
+
+            var listResult = await setup.Controller.GetAttachments(
+                setup.Request.Id, CancellationToken.None);
+            var listed = Assert.Single(Assert.IsType<List<RepairRequestAttachmentResponse>>(
+                Assert.IsType<OkObjectResult>(listResult.Result).Value));
+            Assert.Equal(response.Id, listed.Id);
+
+            var downloadResult = await setup.Controller.DownloadAttachment(
+                setup.Request.Id, response.Id, CancellationToken.None);
+            var physicalFile = Assert.IsType<PhysicalFileResult>(downloadResult);
+            Assert.Equal("image/jpeg", physicalFile.ContentType);
+            Assert.Equal(bytes, await File.ReadAllBytesAsync(physicalFile.FileName));
+        }
+        finally
+        {
+            Directory.Delete(setup.ContentRoot, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task TechnicianStatusChange_RequiresAssignmentAndWritesHistory()
     {
         await using var testDatabase = await TestDatabase.CreateAsync();
@@ -288,7 +400,9 @@ public sealed class WarrantyApiTests
         };
         testDatabase.Context.RepairRequests.Add(repairRequest);
         await testDatabase.Context.SaveChangesAsync();
-        var controller = WithUser(new RepairRequestsController(testDatabase.Context), technician.Id, UserRole.Technician);
+        var controller = WithUser(
+            new RepairRequestsController(testDatabase.Context, CreateAttachmentService(testDatabase.Context)),
+            technician.Id, UserRole.Technician);
 
         var result = await controller.ChangeStatus(
             repairRequest.Id,
@@ -353,7 +467,8 @@ public sealed class WarrantyApiTests
         testDatabase.Context.Users.Add(receptionist);
         await testDatabase.Context.SaveChangesAsync();
         var controller = WithUser(
-            new RepairRequestsController(testDatabase.Context), receptionist.Id, UserRole.Receptionist);
+            new RepairRequestsController(testDatabase.Context, CreateAttachmentService(testDatabase.Context)),
+            receptionist.Id, UserRole.Receptionist);
 
         var result = await controller.ChangeStatus(
             repairRequest.Id,
@@ -392,7 +507,8 @@ public sealed class WarrantyApiTests
         testDatabase.Context.RepairRequests.AddRange(assignedRequest, unassignedRequest);
         await testDatabase.Context.SaveChangesAsync();
         var controller = WithUser(
-            new RepairRequestsController(testDatabase.Context), technician.Id, UserRole.Technician);
+            new RepairRequestsController(testDatabase.Context, CreateAttachmentService(testDatabase.Context)),
+            technician.Id, UserRole.Technician);
 
         var listResult = await controller.GetAll(
             new QueryParameters(), null, CancellationToken.None);
@@ -437,7 +553,8 @@ public sealed class WarrantyApiTests
         testDatabase.Context.Parts.Add(part);
         await testDatabase.Context.SaveChangesAsync();
         var controller = WithUser(
-            new RepairRequestsController(testDatabase.Context), technician.Id, UserRole.Technician);
+            new RepairRequestsController(testDatabase.Context, CreateAttachmentService(testDatabase.Context)),
+            technician.Id, UserRole.Technician);
 
         var firstResult = await controller.AddPart(
             repairRequest.Id,
@@ -571,6 +688,70 @@ public sealed class WarrantyApiTests
         SerialNumber = Guid.NewGuid().ToString("N"),
         WarrantyMonths = 12
     };
+
+    private static async Task<(RepairRequest Request, RepairRequestsController Controller, string ContentRoot)>
+        CreateAttachmentSetupAsync(AppDbContext dbContext, long maxFileSizeBytes = 10 * 1024 * 1024)
+    {
+        var customer = NewUser($"customer-{Guid.NewGuid():N}@example.com", UserRole.Customer);
+        var request = new RepairRequest
+        {
+            WarrantyCard = new WarrantyCard
+            {
+                Product = NewProduct(),
+                Customer = customer,
+                StartDate = DateTime.UtcNow.Date,
+                EndDate = DateTime.UtcNow.Date.AddMonths(12)
+            },
+            Description = "Attachment test"
+        };
+        dbContext.RepairRequests.Add(request);
+        await dbContext.SaveChangesAsync();
+
+        var contentRoot = Path.Combine(Path.GetTempPath(), $"Warranty.Tests-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(contentRoot);
+        var service = CreateAttachmentService(dbContext, contentRoot, maxFileSizeBytes);
+        var controller = WithUser(
+            new RepairRequestsController(dbContext, service), customer.Id, UserRole.Customer);
+        return (request, controller, contentRoot);
+    }
+
+    private static RepairRequestAttachmentService CreateAttachmentService(
+        AppDbContext dbContext,
+        string? contentRoot = null,
+        long maxFileSizeBytes = 10 * 1024 * 1024)
+    {
+        contentRoot ??= Path.GetTempPath();
+        var options = new UploadOptions
+        {
+            RootPath = "uploads",
+            MaxFileSizeBytes = maxFileSizeBytes
+        };
+        return new RepairRequestAttachmentService(
+            dbContext,
+            Microsoft.Extensions.Options.Options.Create(options),
+            new TestWebHostEnvironment(contentRoot),
+            NullLogger<RepairRequestAttachmentService>.Instance);
+    }
+
+    private static IFormFile CreateFormFile(byte[] bytes, string fileName, string contentType)
+    {
+        var file = new FormFile(new MemoryStream(bytes), 0, bytes.Length, "file", fileName)
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = contentType
+        };
+        return file;
+    }
+
+    private sealed class TestWebHostEnvironment(string contentRoot) : IWebHostEnvironment
+    {
+        public string ApplicationName { get; set; } = nameof(WarrantyApiTests);
+        public IFileProvider WebRootFileProvider { get; set; } = new NullFileProvider();
+        public string WebRootPath { get; set; } = contentRoot;
+        public string EnvironmentName { get; set; } = "Testing";
+        public string ContentRootPath { get; set; } = contentRoot;
+        public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
+    }
 
     private static TokenService CreateTokenService()
     {

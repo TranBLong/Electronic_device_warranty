@@ -40,11 +40,16 @@ All routes other than registration, login, and refresh require a valid bearer ac
 | GET/POST | `/api/repair-requests` | Customer/Technician scoped to own records; Admin/Manager/Receptionist see all; Customer or Receptionist creates |
 | PUT | `/api/repair-requests/{id}/technician` | Receptionist or Manager |
 | PUT | `/api/repair-requests/{id}/status` | Assigned Technician |
+| POST | `/api/repair-requests/{id}/attachments` | Multipart `file`; owner Customer, assigned Technician, Admin, Manager, or Receptionist |
+| GET | `/api/repair-requests/{id}/attachments` | Same visibility rules as repair requests |
+| GET | `/api/repair-requests/{id}/attachments/{attachmentId}/download` | Same visibility rules as repair requests |
 | GET | `/api/reports/summary` | Admin or Manager |
 
 Customer registration cannot choose a role. Profile updates accept only FullName, Email, and Phone. Account deactivation sets `IsActive = false`, revokes refresh tokens, blocks future authenticated requests, and preserves referenced records.
 
 Repair requests created by a Customer have a null `ReceptionistId`; receptionist-created requests store the authenticated Receptionist. Warranty eligibility is checked using both persisted status and end date. Every request creation records its initial `Received` state, and every subsequent status change adds a history row in the same save operation.
+
+Repair request attachments are uploaded as `multipart/form-data` using the `file` field. Allowed extensions and content types are configured under `Upload`; JPEG, PNG, and PDF uploads are also checked against their file signatures.
 
 ## Scope
 

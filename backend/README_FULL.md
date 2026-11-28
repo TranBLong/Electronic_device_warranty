@@ -110,6 +110,9 @@ API URL mặc định: `http://localhost:5000` (có thể set `VITE_API_URL`).
 | GET/POST | /api/repair-requests | Scope theo role |
 | PUT | /api/repair-requests/{id}/technician | Receptionist, Manager |
 | PUT | /api/repair-requests/{id}/status | Assigned Technician |
+| POST | /api/repair-requests/{id}/attachments | Multipart `file`; Customer chủ phiếu, Technician được gán, Admin, Manager, Receptionist |
+| GET | /api/repair-requests/{id}/attachments | Cùng phạm vi xem phiếu sửa |
+| GET | /api/repair-requests/{id}/attachments/{attachmentId}/download | Cùng phạm vi xem phiếu sửa |
 | GET | /api/reports/summary | Admin, Manager |
 | CRUD | /api/categories | Admin write |
 | CRUD | /api/parts | Staff read; Admin/Manager write |
@@ -122,6 +125,7 @@ API URL mặc định: `http://localhost:5000` (có thể set `VITE_API_URL`).
 3. **Receptionist/Manager** gán Technician.
 4. **Technician** cập nhật Status (Received → InProgress → Completed → Returned).
 5. Mỗi lần đổi status ghi vào RepairRequestStatusHistory.
+6. File đính kèm được upload bằng `multipart/form-data` (field `file`); chữ ký JPEG, PNG và PDF được xác thực thêm ngoài extension và content-type.
 
 ## Đã bổ sung so với repo gốc
 

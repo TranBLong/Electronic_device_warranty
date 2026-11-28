@@ -12,7 +12,9 @@ namespace Warranty.Controllers;
 [ApiController]
 [Authorize]
 [Route("api/repair-requests")]
-public sealed class RepairRequestsController(AppDbContext dbContext) : ControllerBase
+public sealed class RepairRequestsController(
+    AppDbContext dbContext,
+    RepairRequestAttachmentService attachmentService) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<PagedResult<RepairRequestResponse>>> GetAll(
@@ -395,6 +397,77 @@ public sealed class RepairRequestsController(AppDbContext dbContext) : Controlle
         return NoContent();
     }
 
+    [HttpPost("{id:int}/attachments")]
+    [Consumes("multipart/form-data")]
+    public async Task<ActionResult<RepairRequestAttachmentResponse>> UploadAttachment(
+        int id,
+        [FromForm] IFormFile file,
+        CancellationToken cancellationToken)
+    {
+        var request = await GetRequestQuery()
+            .SingleOrDefaultAsync(candidate => candidate.Id == id, cancellationToken);
+        if (request is null) return NotFound();
+        if (!CanView(request)) return Forbid();
+        if (!User.TryGetUserId(out var uploadedById)) return Unauthorized();
+
+        RepairRequestAttachment attachment;
+        try
+        {
+            attachment = await attachmentService.SaveAsync(id, uploadedById, file, cancellationToken);
+        }
+        catch (FileValidationException exception)
+        {
+            return BadRequest(new ProblemDetails
+            {
+                Title = "Attachment file is invalid.",
+                Detail = exception.Message,
+                Status = StatusCodes.Status400BadRequest
+            });
+        }
+
+        return CreatedAtAction(nameof(GetAttachments), new { id }, ToAttachmentResponse(attachment));
+    }
+
+    [HttpGet("{id:int}/attachments")]
+    public async Task<ActionResult<IReadOnlyList<RepairRequestAttachmentResponse>>> GetAttachments(
+        int id,
+        CancellationToken cancellationToken)
+    {
+        var request = await GetRequestQuery()
+            .SingleOrDefaultAsync(candidate => candidate.Id == id, cancellationToken);
+        if (request is null) return NotFound();
+        if (!CanView(request)) return Forbid();
+
+        var attachments = await dbContext.RepairRequestAttachments.AsNoTracking()
+            .Where(attachment => attachment.RepairRequestId == id)
+            .OrderBy(attachment => attachment.UploadedAt)
+            .Select(attachment => ToAttachmentResponse(attachment))
+            .ToListAsync(cancellationToken);
+        return Ok(attachments);
+    }
+
+    [HttpGet("{id:int}/attachments/{attachmentId:int}/download")]
+    public async Task<IActionResult> DownloadAttachment(
+        int id,
+        int attachmentId,
+        CancellationToken cancellationToken)
+    {
+        var request = await GetRequestQuery()
+            .SingleOrDefaultAsync(candidate => candidate.Id == id, cancellationToken);
+        if (request is null) return NotFound();
+        if (!CanView(request)) return Forbid();
+
+        var attachment = await dbContext.RepairRequestAttachments.AsNoTracking()
+            .SingleOrDefaultAsync(
+                candidate => candidate.Id == attachmentId && candidate.RepairRequestId == id,
+                cancellationToken);
+        if (attachment is null) return NotFound();
+
+        var physicalPath = attachmentService.GetPhysicalPath(attachment.FilePath);
+        if (!System.IO.File.Exists(physicalPath)) return NotFound();
+        return PhysicalFile(physicalPath, attachment.ContentType, attachment.FileName);
+    }
+
     private bool CanView(RepairRequest request)
     {
         if (User.IsInAnyRole(nameof(UserRole.Admin), nameof(UserRole.Manager), nameof(UserRole.Receptionist)))
@@ -443,6 +516,14 @@ public sealed class RepairRequestsController(AppDbContext dbContext) : Controlle
                 history.ChangedBy,
                 history.ChangedAt))
             .ToList());
+
+    private static RepairRequestAttachmentResponse ToAttachmentResponse(RepairRequestAttachment attachment) => new(
+        attachment.Id,
+        attachment.FileName,
+        attachment.ContentType,
+        attachment.FileSize,
+        attachment.UploadedAt,
+        attachment.UploadedById);
 }
 
 public sealed class UpdateRepairRequestBody
