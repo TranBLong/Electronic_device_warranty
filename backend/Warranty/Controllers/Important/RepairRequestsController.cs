@@ -14,6 +14,7 @@ namespace Warranty.Controllers;
 [Route("api/repair-requests")]
 public sealed class RepairRequestsController(
     AppDbContext dbContext,
+    IRepairRequestService repairRequestService,
     RepairRequestAttachmentService attachmentService) : ControllerBase
 {
     [HttpGet]
@@ -83,7 +84,7 @@ public sealed class RepairRequestsController(
         var items = await requests
             .Skip(query.Skip)
             .Take(query.Take)
-            .Select(request => ToResponse(request))
+            .Select(request => RepairRequestMapping.ToResponse(request))
             .ToListAsync(cancellationToken);
         return Ok(PagedResult<RepairRequestResponse>.Create(items, query.PageNumber, query.Take, total));
     }
@@ -96,7 +97,7 @@ public sealed class RepairRequestsController(
         if (request is null) return NotFound();
 
         if (!CanView(request)) return Forbid();
-        return Ok(ToResponse(request));
+        return Ok(RepairRequestMapping.ToResponse(request));
     }
 
     [HttpPost]
@@ -113,40 +114,15 @@ public sealed class RepairRequestsController(
 
         if (!User.TryGetUserId(out var actorId)) return Unauthorized();
 
-        var warrantyCard = await dbContext.WarrantyCards
-            .Include(card => card.Product)
-            .Include(card => card.Customer)
-            .SingleOrDefaultAsync(card => card.Id == request.WarrantyCardId, cancellationToken);
-        if (warrantyCard is null)
-        {
-            return BadRequest(new ProblemDetails { Title = "Warranty card was not found." });
-        }
+        var result = await repairRequestService.CreateAsync(
+            request,
+            actorId,
+            isCustomer,
+            User.IsInRole(nameof(UserRole.Receptionist)),
+            cancellationToken);
+        if (!result.IsSuccess) return ServiceError<RepairRequestResponse>(result);
 
-        if (isCustomer && warrantyCard.CustomerId != actorId) return Forbid();
-
-        if (warrantyCard.Status != WarrantyStatus.Active || warrantyCard.EndDate.Date < DateTime.UtcNow.Date)
-        {
-            return BadRequest(new ProblemDetails { Title = "Repair requests require an active, unexpired warranty." });
-        }
-
-        var repairRequest = new RepairRequest
-        {
-            WarrantyCardId = warrantyCard.Id,
-            ReceptionistId = User.IsInRole(nameof(UserRole.Receptionist)) ? actorId : null,
-            Description = request.Description.Trim(),
-            Status = RepairRequestStatus.Received
-        };
-        repairRequest.StatusHistory.Add(new RepairRequestStatusHistory
-        {
-            OldStatus = null,
-            NewStatus = RepairRequestStatus.Received,
-            ChangedBy = actorId
-        });
-        dbContext.RepairRequests.Add(repairRequest);
-        await dbContext.SaveChangesAsync(cancellationToken);
-
-        repairRequest.WarrantyCard = warrantyCard;
-        return CreatedAtAction(nameof(GetById), new { id = repairRequest.Id }, ToResponse(repairRequest));
+        return CreatedAtAction(nameof(GetById), new { id = result.Value!.Id }, result.Value);
     }
 
     [Authorize(Roles = "Admin,Manager,Receptionist")]
@@ -156,23 +132,8 @@ public sealed class RepairRequestsController(
         AssignTechnicianRequest request,
         CancellationToken cancellationToken)
     {
-        var repairRequest = await GetRequestQuery(tracking: true)
-            .SingleOrDefaultAsync(candidate => candidate.Id == id, cancellationToken);
-        if (repairRequest is null) return NotFound();
-
-        var technician = await dbContext.Users.SingleOrDefaultAsync(
-            user => user.Id == request.TechnicianId && user.Role == UserRole.Technician && user.IsActive,
-            cancellationToken);
-        if (technician is null)
-        {
-            return BadRequest(new ProblemDetails { Title = "An active Technician account is required." });
-        }
-
-        repairRequest.TechnicianId = technician.Id;
-        repairRequest.Technician = technician;
-        repairRequest.UpdatedAt = DateTime.UtcNow;
-        await dbContext.SaveChangesAsync(cancellationToken);
-        return Ok(ToResponse(repairRequest));
+        var result = await repairRequestService.AssignTechnicianAsync(id, request.TechnicianId, cancellationToken);
+        return result.IsSuccess ? Ok(result.Value) : ServiceError<RepairRequestResponse>(result);
     }
 
     /// <summary>
@@ -192,52 +153,11 @@ public sealed class RepairRequestsController(
             return Forbid();
         }
 
-        if (!Enum.IsDefined(request.Status))
-        {
-            return BadRequest(new ProblemDetails { Title = "Repair request status is invalid." });
-        }
-
         if (!User.TryGetUserId(out var actorId)) return Unauthorized();
 
-        var repairRequest = await GetRequestQuery(tracking: true)
-            .SingleOrDefaultAsync(candidate => candidate.Id == id, cancellationToken);
-        if (repairRequest is null) return NotFound();
-
-        if (isTech && !isManagerOrAdmin)
-        {
-            if (repairRequest.TechnicianId != actorId)
-            {
-                return Forbid();
-            }
-        }
-
-        if (repairRequest.Status == request.Status)
-        {
-            return BadRequest(new ProblemDetails { Title = "The repair request already has this status." });
-        }
-
-        if (request.Status == RepairRequestStatus.Returned &&
-            repairRequest.Status != RepairRequestStatus.Completed)
-        {
-            return BadRequest(new ProblemDetails { Title = "A repair request can be returned only after completion." });
-        }
-
-        if (repairRequest.Status is RepairRequestStatus.Returned or RepairRequestStatus.Cancelled)
-        {
-            return BadRequest(new ProblemDetails { Title = "A terminal repair request cannot change status." });
-        }
-
-        var oldStatus = repairRequest.Status;
-        repairRequest.Status = request.Status;
-        repairRequest.UpdatedAt = DateTime.UtcNow;
-        repairRequest.StatusHistory.Add(new RepairRequestStatusHistory
-        {
-            OldStatus = oldStatus,
-            NewStatus = request.Status,
-            ChangedBy = actorId
-        });
-        await dbContext.SaveChangesAsync(cancellationToken);
-        return Ok(ToResponse(repairRequest));
+        var result = await repairRequestService.ChangeStatusAsync(
+            id, request, actorId, isTech, isManagerOrAdmin, cancellationToken);
+        return result.IsSuccess ? Ok(result.Value) : ServiceError<RepairRequestResponse>(result);
     }
 
     [Authorize(Roles = "Admin,Manager,Receptionist")]
@@ -258,7 +178,7 @@ public sealed class RepairRequestsController(
 
         repairRequest.UpdatedAt = DateTime.UtcNow;
         await dbContext.SaveChangesAsync(cancellationToken);
-        return Ok(ToResponse(repairRequest));
+        return Ok(RepairRequestMapping.ToResponse(repairRequest));
     }
 
     [Authorize(Roles = "Admin,Manager,Receptionist")]
@@ -322,53 +242,11 @@ public sealed class RepairRequestsController(
     {
         if (!User.TryGetUserId(out var actorId)) return Unauthorized();
 
-        var request = await dbContext.RepairRequests
-            .Include(r => r.WarrantyCard)
-            .SingleOrDefaultAsync(r => r.Id == id, cancellationToken);
-        if (request is null) return NotFound();
-
         var isTech = User.IsInRole(nameof(UserRole.Technician));
-        if (isTech && request.TechnicianId != actorId && !User.IsInRole(nameof(UserRole.Admin)) && !User.IsInRole(nameof(UserRole.Manager)))
-            return Forbid();
-
-        if (request.Status is RepairRequestStatus.Returned or RepairRequestStatus.Cancelled)
-            return BadRequest(new ProblemDetails { Title = "Cannot add parts to a closed request." });
-
-        var part = await dbContext.Parts.SingleOrDefaultAsync(p => p.Id == body.PartId && p.IsActive, cancellationToken);
-        if (part is null)
-            return BadRequest(new ProblemDetails { Title = "Part not found or inactive." });
-        if (body.Quantity < 1)
-            return BadRequest(new ProblemDetails { Title = "Quantity must be at least 1." });
-        if (part.StockQuantity < body.Quantity)
-            return BadRequest(new ProblemDetails { Title = "Insufficient stock." });
-
-        var line = await dbContext.RepairRequestParts.SingleOrDefaultAsync(
-            item => item.RepairRequestId == id && item.PartId == part.Id,
-            cancellationToken);
-
-        part.StockQuantity -= body.Quantity;
-        if (line is null)
-        {
-            line = new RepairRequestPart
-            {
-                RepairRequestId = id,
-                PartId = part.Id,
-                Quantity = body.Quantity,
-                UnitPrice = part.UnitPrice,
-            };
-            dbContext.RepairRequestParts.Add(line);
-        }
-        else
-        {
-            line.Quantity += body.Quantity;
-        }
-
-        request.UpdatedAt = DateTime.UtcNow;
-        await dbContext.SaveChangesAsync(cancellationToken);
-
-        return Ok(new RepairPartLineResponse(
-            line.Id, part.Id, part.Code, part.Name, line.Quantity, line.UnitPrice,
-            line.Quantity * line.UnitPrice, line.AddedAt));
+        var isManagerOrAdmin = User.IsInAnyRole(nameof(UserRole.Admin), nameof(UserRole.Manager));
+        var result = await repairRequestService.AddPartAsync(
+            id, body, actorId, isTech, isManagerOrAdmin, cancellationToken);
+        return result.IsSuccess ? Ok(result.Value) : ServiceError<RepairPartLineResponse>(result);
     }
 
     [Authorize(Roles = "Admin,Manager,Technician")]
@@ -495,27 +373,14 @@ public sealed class RepairRequestsController(
             .Include(request => request.StatusHistory.OrderBy(history => history.ChangedAt));
     }
 
-    private static RepairRequestResponse ToResponse(RepairRequest request) => new(
-        request.Id,
-        request.WarrantyCardId,
-        request.WarrantyCard.CustomerId,
-        request.WarrantyCard.Customer.FullName,
-        request.ReceptionistId,
-        request.TechnicianId,
-        request.Technician?.FullName,
-        request.Description,
-        request.Status,
-        request.CreatedAt,
-        request.UpdatedAt,
-        request.StatusHistory
-            .OrderBy(history => history.ChangedAt)
-            .Select(history => new RepairStatusHistoryResponse(
-                history.Id,
-                history.OldStatus,
-                history.NewStatus,
-                history.ChangedBy,
-                history.ChangedAt))
-            .ToList());
+    private ActionResult<T> ServiceError<T>(ServiceResult<T> result) =>
+        result.ErrorCode switch
+        {
+            ServiceErrorCode.NotFound => NotFound(),
+            ServiceErrorCode.Forbidden => Forbid(),
+            ServiceErrorCode.Invalid => BadRequest(new ProblemDetails { Title = result.ErrorMessage }),
+            _ => throw new InvalidOperationException("A successful result cannot be mapped to an error response.")
+        };
 
     private static RepairRequestAttachmentResponse ToAttachmentResponse(RepairRequestAttachment attachment) => new(
         attachment.Id,
@@ -531,22 +396,3 @@ public sealed class UpdateRepairRequestBody
     [System.ComponentModel.DataAnnotations.StringLength(4000)]
     public string? Description { get; init; }
 }
-
-public sealed class AddRepairPartRequest
-{
-    [System.ComponentModel.DataAnnotations.Range(1, int.MaxValue)]
-    public int PartId { get; init; }
-
-    [System.ComponentModel.DataAnnotations.Range(1, 10000)]
-    public int Quantity { get; init; }
-}
-
-public sealed record RepairPartLineResponse(
-    int Id,
-    int PartId,
-    string PartCode,
-    string PartName,
-    int Quantity,
-    decimal UnitPrice,
-    decimal LineTotal,
-    DateTime AddedAt);

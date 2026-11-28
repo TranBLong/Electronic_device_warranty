@@ -4,7 +4,6 @@ using Microsoft.EntityFrameworkCore;
 using Warranty.Data;
 using Warranty.Dtos;
 using Warranty.Enums;
-using Warranty.Models;
 using Warranty.Services;
 
 namespace Warranty.Controllers;
@@ -12,7 +11,9 @@ namespace Warranty.Controllers;
 [ApiController]
 [Authorize]
 [Route("api/warranty-cards")]
-public sealed class WarrantyCardsController(AppDbContext dbContext) : ControllerBase
+public sealed class WarrantyCardsController(
+    AppDbContext dbContext,
+    IWarrantyCardService warrantyCardService) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<PagedResult<WarrantyCardResponse>>> GetAll(
@@ -77,7 +78,7 @@ public sealed class WarrantyCardsController(AppDbContext dbContext) : Controller
         var items = await cards
             .Skip(query.Skip)
             .Take(query.Take)
-            .Select(card => ToResponse(card))
+            .Select(card => WarrantyCardMapping.ToResponse(card))
             .ToListAsync(cancellationToken);
         return Ok(PagedResult<WarrantyCardResponse>.Create(items, query.PageNumber, query.Take, total));
     }
@@ -105,7 +106,7 @@ public sealed class WarrantyCardsController(AppDbContext dbContext) : Controller
             return Forbid();
         }
 
-        return Ok(ToResponse(card));
+        return Ok(WarrantyCardMapping.ToResponse(card));
     }
 
     [AllowAnonymous]
@@ -141,41 +142,10 @@ public sealed class WarrantyCardsController(AppDbContext dbContext) : Controller
         CreateWarrantyCardRequest request,
         CancellationToken cancellationToken)
     {
-        if (request.StartDate == default)
-        {
-            return BadRequest(new ProblemDetails { Title = "Start date is required." });
-        }
+        var result = await warrantyCardService.CreateAsync(request, cancellationToken);
+        if (!result.IsSuccess) return ServiceError<WarrantyCardResponse>(result);
 
-        var product = await dbContext.Products.SingleOrDefaultAsync(
-            candidate => candidate.Id == request.ProductId, cancellationToken);
-        if (product is null)
-        {
-            return BadRequest(new ProblemDetails { Title = "Product was not found." });
-        }
-
-        var customer = await dbContext.Users.SingleOrDefaultAsync(
-            candidate => candidate.Id == request.CustomerId && candidate.Role == UserRole.Customer && candidate.IsActive,
-            cancellationToken);
-        if (customer is null)
-        {
-            return BadRequest(new ProblemDetails { Title = "An active Customer account is required." });
-        }
-
-        var startDate = DateTime.SpecifyKind(request.StartDate.Date, DateTimeKind.Utc);
-        var card = new WarrantyCard
-        {
-            ProductId = product.Id,
-            CustomerId = customer.Id,
-            StartDate = startDate,
-            EndDate = startDate.AddMonths(product.WarrantyMonths),
-            Status = WarrantyStatus.Active
-        };
-        dbContext.WarrantyCards.Add(card);
-        await dbContext.SaveChangesAsync(cancellationToken);
-
-        card.Product = product;
-        card.Customer = customer;
-        return CreatedAtAction(nameof(GetById), new { id = card.Id }, ToResponse(card));
+        return CreatedAtAction(nameof(GetById), new { id = result.Value!.Id }, result.Value);
     }
 
     [Authorize(Roles = "Admin,Manager,Receptionist")]
@@ -185,39 +155,8 @@ public sealed class WarrantyCardsController(AppDbContext dbContext) : Controller
         UpdateWarrantyCardRequest request,
         CancellationToken cancellationToken)
     {
-        var card = await dbContext.WarrantyCards
-            .Include(c => c.Product)
-            .Include(c => c.Customer)
-            .SingleOrDefaultAsync(c => c.Id == id, cancellationToken);
-        if (card is null) return NotFound();
-
-        if (request.Status is not null)
-        {
-            if (!Enum.IsDefined(request.Status.Value))
-            {
-                return BadRequest(new ProblemDetails { Title = "Invalid warranty status." });
-            }
-            card.Status = request.Status.Value;
-        }
-
-        if (request.StartDate is not null)
-        {
-            card.StartDate = DateTime.SpecifyKind(request.StartDate.Value.Date, DateTimeKind.Utc);
-            card.EndDate = card.StartDate.AddMonths(card.Product.WarrantyMonths);
-        }
-
-        if (request.EndDate is not null)
-        {
-            var end = DateTime.SpecifyKind(request.EndDate.Value.Date, DateTimeKind.Utc);
-            if (end < card.StartDate)
-            {
-                return BadRequest(new ProblemDetails { Title = "End date must be on or after start date." });
-            }
-            card.EndDate = end;
-        }
-
-        await dbContext.SaveChangesAsync(cancellationToken);
-        return Ok(ToResponse(card));
+        var result = await warrantyCardService.UpdateAsync(id, request, cancellationToken);
+        return result.IsSuccess ? Ok(result.Value) : ServiceError<WarrantyCardResponse>(result);
     }
 
     [Authorize(Roles = "Admin,Manager,Receptionist")]
@@ -240,23 +179,12 @@ public sealed class WarrantyCardsController(AppDbContext dbContext) : Controller
         return NoContent();
     }
 
-    private static WarrantyCardResponse ToResponse(WarrantyCard card) => new(
-        card.Id,
-        card.ProductId,
-        card.Product.Name,
-        card.Product.SerialNumber,
-        card.CustomerId,
-        card.Customer.FullName,
-        card.StartDate,
-        card.EndDate,
-        card.Status == WarrantyStatus.Active && card.EndDate.Date < DateTime.UtcNow.Date
-            ? WarrantyStatus.Expired
-            : card.Status);
-}
-
-public sealed class UpdateWarrantyCardRequest
-{
-    public DateTime? StartDate { get; init; }
-    public DateTime? EndDate { get; init; }
-    public WarrantyStatus? Status { get; init; }
+    private ActionResult<T> ServiceError<T>(ServiceResult<T> result) =>
+        result.ErrorCode switch
+        {
+            ServiceErrorCode.NotFound => NotFound(),
+            ServiceErrorCode.Forbidden => Forbid(),
+            ServiceErrorCode.Invalid => BadRequest(new ProblemDetails { Title = result.ErrorMessage }),
+            _ => throw new InvalidOperationException("A successful result cannot be mapped to an error response.")
+        };
 }

@@ -14,6 +14,13 @@ public sealed class CreateWarrantyCardRequest
     public DateTime StartDate { get; init; }
 }
 
+public sealed class UpdateWarrantyCardRequest
+{
+    public DateTime? StartDate { get; init; }
+    public DateTime? EndDate { get; init; }
+    public WarrantyStatus? Status { get; init; }
+}
+
 public sealed record WarrantyCardResponse(
     int Id,
     int ProductId,

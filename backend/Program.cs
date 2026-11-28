@@ -58,6 +58,8 @@ builder.Services.AddSwaggerGen(options =>
 });
 
 builder.Services.AddSingleton<TokenService>();
+builder.Services.AddScoped<IRepairRequestService, RepairRequestService>();
+builder.Services.AddScoped<IWarrantyCardService, WarrantyCardService>();
 builder.Services.AddScoped<RepairRequestAttachmentService>();
 builder.Services.AddScoped<UserAvatarService>();
 builder.Services.AddScoped<NotificationService>();

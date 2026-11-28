@@ -232,7 +232,10 @@ public sealed class WarrantyApiTests
         testDatabase.Context.WarrantyCards.Add(card);
         await testDatabase.Context.SaveChangesAsync();
         var controller = WithUser(
-            new RepairRequestsController(testDatabase.Context, CreateAttachmentService(testDatabase.Context)),
+            new RepairRequestsController(
+                testDatabase.Context,
+                new RepairRequestService(testDatabase.Context),
+                CreateAttachmentService(testDatabase.Context)),
             customer.Id, UserRole.Customer);
 
         var result = await controller.Create(new CreateRepairRequest
@@ -401,7 +404,10 @@ public sealed class WarrantyApiTests
         testDatabase.Context.RepairRequests.Add(repairRequest);
         await testDatabase.Context.SaveChangesAsync();
         var controller = WithUser(
-            new RepairRequestsController(testDatabase.Context, CreateAttachmentService(testDatabase.Context)),
+            new RepairRequestsController(
+                testDatabase.Context,
+                new RepairRequestService(testDatabase.Context),
+                CreateAttachmentService(testDatabase.Context)),
             technician.Id, UserRole.Technician);
 
         var result = await controller.ChangeStatus(
@@ -446,6 +452,45 @@ public sealed class WarrantyApiTests
     }
 
     [Fact]
+    public async Task AssignTechnician_UpdatesRequestThroughService()
+    {
+        await using var testDatabase = await TestDatabase.CreateAsync();
+        var manager = NewUser("manager@example.com", UserRole.Manager);
+        var technician = NewUser("tech@example.com", UserRole.Technician);
+        var repairRequest = new RepairRequest
+        {
+            WarrantyCard = new WarrantyCard
+            {
+                Product = NewProduct(),
+                Customer = NewUser("customer@example.com", UserRole.Customer),
+                StartDate = DateTime.UtcNow.Date,
+                EndDate = DateTime.UtcNow.Date.AddMonths(12)
+            },
+            Description = "Assign a technician"
+        };
+        testDatabase.Context.Users.AddRange(manager, technician);
+        testDatabase.Context.RepairRequests.Add(repairRequest);
+        await testDatabase.Context.SaveChangesAsync();
+        var controller = WithUser(
+            new RepairRequestsController(
+                testDatabase.Context,
+                new RepairRequestService(testDatabase.Context),
+                CreateAttachmentService(testDatabase.Context)),
+            manager.Id, UserRole.Manager);
+
+        var result = await controller.AssignTechnician(
+            repairRequest.Id,
+            new AssignTechnicianRequest { TechnicianId = technician.Id },
+            CancellationToken.None);
+
+        var response = Assert.IsType<RepairRequestResponse>(
+            Assert.IsType<OkObjectResult>(result.Result).Value);
+        Assert.Equal(technician.Id, response.TechnicianId);
+        Assert.Equal(technician.Id,
+            (await testDatabase.Context.RepairRequests.SingleAsync()).TechnicianId);
+    }
+
+    [Fact]
     public async Task ReceptionistChangeStatus_IsForbidden()
     {
         await using var testDatabase = await TestDatabase.CreateAsync();
@@ -467,7 +512,10 @@ public sealed class WarrantyApiTests
         testDatabase.Context.Users.Add(receptionist);
         await testDatabase.Context.SaveChangesAsync();
         var controller = WithUser(
-            new RepairRequestsController(testDatabase.Context, CreateAttachmentService(testDatabase.Context)),
+            new RepairRequestsController(
+                testDatabase.Context,
+                new RepairRequestService(testDatabase.Context),
+                CreateAttachmentService(testDatabase.Context)),
             receptionist.Id, UserRole.Receptionist);
 
         var result = await controller.ChangeStatus(
@@ -507,7 +555,10 @@ public sealed class WarrantyApiTests
         testDatabase.Context.RepairRequests.AddRange(assignedRequest, unassignedRequest);
         await testDatabase.Context.SaveChangesAsync();
         var controller = WithUser(
-            new RepairRequestsController(testDatabase.Context, CreateAttachmentService(testDatabase.Context)),
+            new RepairRequestsController(
+                testDatabase.Context,
+                new RepairRequestService(testDatabase.Context),
+                CreateAttachmentService(testDatabase.Context)),
             technician.Id, UserRole.Technician);
 
         var listResult = await controller.GetAll(
@@ -553,7 +604,10 @@ public sealed class WarrantyApiTests
         testDatabase.Context.Parts.Add(part);
         await testDatabase.Context.SaveChangesAsync();
         var controller = WithUser(
-            new RepairRequestsController(testDatabase.Context, CreateAttachmentService(testDatabase.Context)),
+            new RepairRequestsController(
+                testDatabase.Context,
+                new RepairRequestService(testDatabase.Context),
+                CreateAttachmentService(testDatabase.Context)),
             technician.Id, UserRole.Technician);
 
         var firstResult = await controller.AddPart(
@@ -601,7 +655,9 @@ public sealed class WarrantyApiTests
         };
         testDatabase.Context.WarrantyCards.Add(card);
         await testDatabase.Context.SaveChangesAsync();
-        var controller = new WarrantyCardsController(testDatabase.Context);
+        var controller = new WarrantyCardsController(
+            testDatabase.Context,
+            new WarrantyCardService(testDatabase.Context));
 
         var result = await controller.LookupBySerial(product.SerialNumber.ToLowerInvariant(), CancellationToken.None);
 
@@ -614,6 +670,47 @@ public sealed class WarrantyApiTests
                 .GetMethod(nameof(WarrantyCardsController.LookupBySerial))!
                 .GetCustomAttributes(typeof(AllowAnonymousAttribute), inherit: true),
             attribute => attribute is AllowAnonymousAttribute);
+    }
+
+    [Fact]
+    public async Task WarrantyCardController_CreatesAndUpdatesThroughService()
+    {
+        await using var testDatabase = await TestDatabase.CreateAsync();
+        var customer = NewUser("customer@example.com", UserRole.Customer);
+        var product = NewProduct();
+        testDatabase.Context.Users.Add(customer);
+        testDatabase.Context.Products.Add(product);
+        await testDatabase.Context.SaveChangesAsync();
+        var controller = new WarrantyCardsController(
+            testDatabase.Context,
+            new WarrantyCardService(testDatabase.Context));
+        var startDate = DateTime.UtcNow.Date.AddDays(-10);
+
+        var createResult = await controller.Create(new CreateWarrantyCardRequest
+        {
+            ProductId = product.Id,
+            CustomerId = customer.Id,
+            StartDate = startDate
+        }, CancellationToken.None);
+
+        var created = Assert.IsType<WarrantyCardResponse>(
+            Assert.IsType<CreatedAtActionResult>(createResult.Result).Value);
+        Assert.Equal(startDate, created.StartDate);
+        Assert.Equal(startDate.AddMonths(product.WarrantyMonths), created.EndDate);
+        Assert.Equal(WarrantyStatus.Active, created.Status);
+
+        var updatedStartDate = startDate.AddDays(1);
+        var updateResult = await controller.Update(created.Id, new UpdateWarrantyCardRequest
+        {
+            StartDate = updatedStartDate,
+            Status = WarrantyStatus.Voided
+        }, CancellationToken.None);
+
+        var updated = Assert.IsType<WarrantyCardResponse>(
+            Assert.IsType<OkObjectResult>(updateResult.Result).Value);
+        Assert.Equal(updatedStartDate, updated.StartDate);
+        Assert.Equal(updatedStartDate.AddMonths(product.WarrantyMonths), updated.EndDate);
+        Assert.Equal(WarrantyStatus.Voided, updated.Status);
     }
 
     [Fact]
@@ -640,7 +737,8 @@ public sealed class WarrantyApiTests
         await testDatabase.Context.SaveChangesAsync();
 
         var managerController = WithUser(
-            new WarrantyCardsController(testDatabase.Context), 1, UserRole.Manager);
+            new WarrantyCardsController(testDatabase.Context, new WarrantyCardService(testDatabase.Context)),
+            1, UserRole.Manager);
         var managerResult = await managerController.GetAll(
             new QueryParameters(), null, CancellationToken.None);
         var managerCards = Assert.IsType<PagedResult<WarrantyCardResponse>>(
@@ -648,7 +746,8 @@ public sealed class WarrantyApiTests
         Assert.Equal(2, managerCards.TotalCount);
 
         var customerController = WithUser(
-            new WarrantyCardsController(testDatabase.Context), firstCustomer.Id, UserRole.Customer);
+            new WarrantyCardsController(testDatabase.Context, new WarrantyCardService(testDatabase.Context)),
+            firstCustomer.Id, UserRole.Customer);
         var customerResult = await customerController.GetAll(
             new QueryParameters(), null, CancellationToken.None);
         var customerCards = Assert.IsType<PagedResult<WarrantyCardResponse>>(
@@ -711,7 +810,8 @@ public sealed class WarrantyApiTests
         Directory.CreateDirectory(contentRoot);
         var service = CreateAttachmentService(dbContext, contentRoot, maxFileSizeBytes);
         var controller = WithUser(
-            new RepairRequestsController(dbContext, service), customer.Id, UserRole.Customer);
+            new RepairRequestsController(dbContext, new RepairRequestService(dbContext), service),
+            customer.Id, UserRole.Customer);
         return (request, controller, contentRoot);
     }
 

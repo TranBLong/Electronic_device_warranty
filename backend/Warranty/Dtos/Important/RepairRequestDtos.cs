@@ -24,6 +24,25 @@ public sealed class ChangeRepairStatusRequest
     public RepairRequestStatus Status { get; init; }
 }
 
+public sealed class AddRepairPartRequest
+{
+    [Range(1, int.MaxValue)]
+    public int PartId { get; init; }
+
+    [Range(1, 10000)]
+    public int Quantity { get; init; }
+}
+
+public sealed record RepairPartLineResponse(
+    int Id,
+    int PartId,
+    string PartCode,
+    string PartName,
+    int Quantity,
+    decimal UnitPrice,
+    decimal LineTotal,
+    DateTime AddedAt);
+
 public sealed record RepairStatusHistoryResponse(
     int Id,
     RepairRequestStatus? OldStatus,
