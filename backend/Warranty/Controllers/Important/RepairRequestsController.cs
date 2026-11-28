@@ -30,9 +30,7 @@ public sealed class RepairRequestsController(AppDbContext dbContext) : Controlle
         else if (User.IsInRole(nameof(UserRole.Technician)))
         {
             if (!User.TryGetUserId(out var technicianId)) return Unauthorized();
-            // Technician sees assigned jobs + unassigned (để nhận việc nếu cần)
-            requests = requests.Where(request =>
-                request.TechnicianId == technicianId || request.TechnicianId == null);
+            requests = requests.Where(request => request.TechnicianId == technicianId);
         }
         else if (!User.IsInAnyRole(
                      nameof(UserRole.Admin),
@@ -185,6 +183,13 @@ public sealed class RepairRequestsController(AppDbContext dbContext) : Controlle
         ChangeRepairStatusRequest request,
         CancellationToken cancellationToken)
     {
+        var isTech = User.IsInRole(nameof(UserRole.Technician));
+        var isManagerOrAdmin = User.IsInAnyRole(nameof(UserRole.Admin), nameof(UserRole.Manager));
+        if (!isTech && !isManagerOrAdmin)
+        {
+            return Forbid();
+        }
+
         if (!Enum.IsDefined(request.Status))
         {
             return BadRequest(new ProblemDetails { Title = "Repair request status is invalid." });
@@ -195,9 +200,6 @@ public sealed class RepairRequestsController(AppDbContext dbContext) : Controlle
         var repairRequest = await GetRequestQuery(tracking: true)
             .SingleOrDefaultAsync(candidate => candidate.Id == id, cancellationToken);
         if (repairRequest is null) return NotFound();
-
-        var isTech = User.IsInRole(nameof(UserRole.Technician));
-        var isManagerOrAdmin = User.IsInAnyRole(nameof(UserRole.Admin), nameof(UserRole.Manager));
 
         if (isTech && !isManagerOrAdmin)
         {
@@ -338,15 +340,27 @@ public sealed class RepairRequestsController(AppDbContext dbContext) : Controlle
         if (part.StockQuantity < body.Quantity)
             return BadRequest(new ProblemDetails { Title = "Insufficient stock." });
 
+        var line = await dbContext.RepairRequestParts.SingleOrDefaultAsync(
+            item => item.RepairRequestId == id && item.PartId == part.Id,
+            cancellationToken);
+
         part.StockQuantity -= body.Quantity;
-        var line = new RepairRequestPart
+        if (line is null)
         {
-            RepairRequestId = id,
-            PartId = part.Id,
-            Quantity = body.Quantity,
-            UnitPrice = part.UnitPrice,
-        };
-        dbContext.RepairRequestParts.Add(line);
+            line = new RepairRequestPart
+            {
+                RepairRequestId = id,
+                PartId = part.Id,
+                Quantity = body.Quantity,
+                UnitPrice = part.UnitPrice,
+            };
+            dbContext.RepairRequestParts.Add(line);
+        }
+        else
+        {
+            line.Quantity += body.Quantity;
+        }
+
         request.UpdatedAt = DateTime.UtcNow;
         await dbContext.SaveChangesAsync(cancellationToken);
 
@@ -392,7 +406,7 @@ public sealed class RepairRequestsController(AppDbContext dbContext) : Controlle
             return request.WarrantyCard.CustomerId == userId;
 
         if (User.IsInRole(nameof(UserRole.Technician)))
-            return request.TechnicianId == userId || request.TechnicianId is null;
+            return request.TechnicianId == userId;
 
         return false;
     }

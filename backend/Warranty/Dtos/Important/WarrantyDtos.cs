@@ -24,3 +24,12 @@ public sealed record WarrantyCardResponse(
     DateTime StartDate,
     DateTime EndDate,
     WarrantyStatus Status);
+
+public sealed record WarrantyCardLookupResponse(
+    int Id,
+    int ProductId,
+    string ProductName,
+    string SerialNumber,
+    DateTime StartDate,
+    DateTime EndDate,
+    WarrantyStatus Status);

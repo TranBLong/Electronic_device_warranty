@@ -108,6 +108,33 @@ public sealed class WarrantyCardsController(AppDbContext dbContext) : Controller
         return Ok(ToResponse(card));
     }
 
+    [AllowAnonymous]
+    [HttpGet("by-serial/{serialNumber}")]
+    public async Task<ActionResult<WarrantyCardLookupResponse>> LookupBySerial(
+        string serialNumber,
+        CancellationToken cancellationToken)
+    {
+        var normalizedSerialNumber = serialNumber.Trim().ToUpperInvariant();
+        var card = await dbContext.WarrantyCards.AsNoTracking()
+            .Include(candidate => candidate.Product)
+            .SingleOrDefaultAsync(
+                candidate => candidate.Product.SerialNumber == normalizedSerialNumber,
+                cancellationToken);
+        if (card is null) return NotFound();
+
+        var status = card.Status == WarrantyStatus.Active && card.EndDate.Date < DateTime.UtcNow.Date
+            ? WarrantyStatus.Expired
+            : card.Status;
+        return Ok(new WarrantyCardLookupResponse(
+            card.Id,
+            card.ProductId,
+            card.Product.Name,
+            card.Product.SerialNumber,
+            card.StartDate,
+            card.EndDate,
+            status));
+    }
+
     [Authorize(Roles = "Admin,Manager,Receptionist")]
     [HttpPost]
     public async Task<ActionResult<WarrantyCardResponse>> Create(

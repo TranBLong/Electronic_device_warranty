@@ -2,16 +2,18 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 using Warranty.Controllers;
 using Warranty.Data;
 using Warranty.Dtos;
 using Warranty.Enums;
 using Warranty.Models;
+using Warranty.Options;
 using Warranty.Services;
 
 namespace Warranty.Tests;
@@ -19,17 +21,16 @@ namespace Warranty.Tests;
 public sealed class WarrantyApiTests
 {
     [Fact]
-    public async Task SeedAsync_InsertsFiveRecordsPerTableUsingGeneratedIds()
+    public async Task SeedAsync_InsertsSeedDataUsingGeneratedIds()
     {
         await using var testDatabase = await TestDatabase.CreateAsync();
 
         await DatabaseSeeder.SeedAsync(testDatabase.Context);
 
-        Assert.Equal(5, await testDatabase.Context.Users.CountAsync());
-        Assert.Equal(5, await testDatabase.Context.Products.CountAsync());
-        Assert.Equal(5, await testDatabase.Context.WarrantyCards.CountAsync());
-        Assert.Equal(5, await testDatabase.Context.RepairRequests.CountAsync());
-        Assert.Equal(5, await testDatabase.Context.RepairRequestStatusHistories.CountAsync());
+        Assert.Equal(1000, await testDatabase.Context.Users.CountAsync());
+        Assert.Equal(325, await testDatabase.Context.Products.CountAsync());
+        Assert.Equal(28, await testDatabase.Context.RepairRequests.CountAsync());
+        Assert.Equal(56, await testDatabase.Context.RepairRequestStatusHistories.CountAsync());
         Assert.Equal(5, await testDatabase.Context.RefreshTokens.CountAsync());
         Assert.All(await testDatabase.Context.Users.Select(user => user.Id).ToListAsync(), id => Assert.True(id > 0));
         Assert.All(await testDatabase.Context.Products.Select(product => product.Id).ToListAsync(), id => Assert.True(id > 0));
@@ -39,10 +40,15 @@ public sealed class WarrantyApiTests
             .Include(card => card.Customer)
             .ToListAsync();
         Assert.All(cards, card => Assert.Equal(UserRole.Customer, card.Customer.Role));
-        Assert.Equal(5, cards.Select(card => card.ProductId).Distinct().Count());
+        var coreSerialNumbers = new[]
+        {
+            "DLSXPS13-001", "IP15P-2024-001", "TABS9-2024-001", "LG34-2024-001", "CANON-G2020-001"
+        };
+        Assert.All(coreSerialNumbers,
+            serialNumber => Assert.Contains(cards, card => card.Product.SerialNumber == serialNumber));
 
         await DatabaseSeeder.SeedAsync(testDatabase.Context);
-        Assert.Equal(5, await testDatabase.Context.Users.CountAsync());
+        Assert.Equal(1000, await testDatabase.Context.Users.CountAsync());
     }
 
     [Fact]
@@ -50,6 +56,10 @@ public sealed class WarrantyApiTests
     {
         await using var testDatabase = await TestDatabase.CreateAsync();
         var controller = new AuthController(testDatabase.Context, CreateTokenService());
+        controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
 
         var result = await controller.Register(new RegisterRequest
         {
@@ -322,14 +332,212 @@ public sealed class WarrantyApiTests
     }
 
     [Fact]
-    public async Task ManagerCannotReadAllCustomerWarrantyCards()
+    public async Task ReceptionistChangeStatus_IsForbidden()
     {
         await using var testDatabase = await TestDatabase.CreateAsync();
-        var controller = WithUser(new WarrantyCardsController(testDatabase.Context), 1, UserRole.Manager);
+        var receptionist = NewUser("reception@example.com", UserRole.Receptionist);
+        var customer = NewUser("customer@example.com", UserRole.Customer);
+        var card = new WarrantyCard
+        {
+            Product = NewProduct(),
+            Customer = customer,
+            StartDate = DateTime.UtcNow.Date,
+            EndDate = DateTime.UtcNow.Date.AddMonths(12)
+        };
+        var repairRequest = new RepairRequest
+        {
+            WarrantyCard = card,
+            Description = "Check device"
+        };
+        testDatabase.Context.RepairRequests.Add(repairRequest);
+        testDatabase.Context.Users.Add(receptionist);
+        await testDatabase.Context.SaveChangesAsync();
+        var controller = WithUser(
+            new RepairRequestsController(testDatabase.Context), receptionist.Id, UserRole.Receptionist);
 
-        var result = await controller.GetAll(CancellationToken.None);
+        var result = await controller.ChangeStatus(
+            repairRequest.Id,
+            new ChangeRepairStatusRequest { Status = RepairRequestStatus.InProgress },
+            CancellationToken.None);
 
         Assert.IsType<ForbidResult>(result.Result);
+        Assert.Equal(RepairRequestStatus.Received,
+            (await testDatabase.Context.RepairRequests.AsNoTracking().SingleAsync()).Status);
+    }
+
+    [Fact]
+    public async Task TechnicianCanOnlyViewAssignedRepairRequests()
+    {
+        await using var testDatabase = await TestDatabase.CreateAsync();
+        var technician = NewUser("tech@example.com", UserRole.Technician);
+        var customer = NewUser("customer@example.com", UserRole.Customer);
+        var card = new WarrantyCard
+        {
+            Product = NewProduct(),
+            Customer = customer,
+            StartDate = DateTime.UtcNow.Date,
+            EndDate = DateTime.UtcNow.Date.AddMonths(12)
+        };
+        var assignedRequest = new RepairRequest
+        {
+            WarrantyCard = card,
+            Technician = technician,
+            Description = "Assigned repair"
+        };
+        var unassignedRequest = new RepairRequest
+        {
+            WarrantyCard = card,
+            Description = "Unassigned repair"
+        };
+        testDatabase.Context.RepairRequests.AddRange(assignedRequest, unassignedRequest);
+        await testDatabase.Context.SaveChangesAsync();
+        var controller = WithUser(
+            new RepairRequestsController(testDatabase.Context), technician.Id, UserRole.Technician);
+
+        var listResult = await controller.GetAll(
+            new QueryParameters(), null, CancellationToken.None);
+        var response = Assert.IsType<PagedResult<RepairRequestResponse>>(
+            Assert.IsType<OkObjectResult>(listResult.Result).Value);
+        var visibleRequest = Assert.Single(response.Items);
+        Assert.Equal(assignedRequest.Id, visibleRequest.Id);
+
+        var assignedResult = await controller.GetById(assignedRequest.Id, CancellationToken.None);
+        Assert.IsType<OkObjectResult>(assignedResult.Result);
+        var unassignedResult = await controller.GetById(unassignedRequest.Id, CancellationToken.None);
+        Assert.IsType<ForbidResult>(unassignedResult.Result);
+    }
+
+    [Fact]
+    public async Task AddPart_AccumulatesExistingLineAndChecksAdditionalStock()
+    {
+        await using var testDatabase = await TestDatabase.CreateAsync();
+        var technician = NewUser("tech@example.com", UserRole.Technician);
+        var customer = NewUser("customer@example.com", UserRole.Customer);
+        var card = new WarrantyCard
+        {
+            Product = NewProduct(),
+            Customer = customer,
+            StartDate = DateTime.UtcNow.Date,
+            EndDate = DateTime.UtcNow.Date.AddMonths(12)
+        };
+        var repairRequest = new RepairRequest
+        {
+            WarrantyCard = card,
+            Technician = technician,
+            Description = "Replace part"
+        };
+        var part = new Part
+        {
+            Code = "PART-1",
+            Name = "Replacement part",
+            UnitPrice = 125m,
+            StockQuantity = 5
+        };
+        testDatabase.Context.RepairRequests.Add(repairRequest);
+        testDatabase.Context.Parts.Add(part);
+        await testDatabase.Context.SaveChangesAsync();
+        var controller = WithUser(
+            new RepairRequestsController(testDatabase.Context), technician.Id, UserRole.Technician);
+
+        var firstResult = await controller.AddPart(
+            repairRequest.Id,
+            new AddRepairPartRequest { PartId = part.Id, Quantity = 2 },
+            CancellationToken.None);
+        var firstLine = Assert.IsType<RepairPartLineResponse>(
+            Assert.IsType<OkObjectResult>(firstResult.Result).Value);
+
+        var secondResult = await controller.AddPart(
+            repairRequest.Id,
+            new AddRepairPartRequest { PartId = part.Id, Quantity = 2 },
+            CancellationToken.None);
+        var secondLine = Assert.IsType<RepairPartLineResponse>(
+            Assert.IsType<OkObjectResult>(secondResult.Result).Value);
+
+        Assert.Equal(firstLine.Id, secondLine.Id);
+        Assert.Equal(4, secondLine.Quantity);
+        Assert.Equal(500m, secondLine.LineTotal);
+        Assert.Equal(1, await testDatabase.Context.RepairRequestParts.CountAsync());
+        Assert.Equal(1, (await testDatabase.Context.Parts.SingleAsync()).StockQuantity);
+
+        var insufficientStockResult = await controller.AddPart(
+            repairRequest.Id,
+            new AddRepairPartRequest { PartId = part.Id, Quantity = 2 },
+            CancellationToken.None);
+        Assert.IsType<BadRequestObjectResult>(insufficientStockResult.Result);
+        Assert.Equal(4, (await testDatabase.Context.RepairRequestParts.SingleAsync()).Quantity);
+        Assert.Equal(1, (await testDatabase.Context.Parts.SingleAsync()).StockQuantity);
+    }
+
+    [Fact]
+    public async Task LookupBySerial_IsAnonymousAndOmitsCustomerName()
+    {
+        await using var testDatabase = await TestDatabase.CreateAsync();
+        var customer = NewUser("customer@example.com", UserRole.Customer);
+        var product = NewProduct();
+        product.SerialNumber = product.SerialNumber.ToUpperInvariant();
+        var card = new WarrantyCard
+        {
+            Product = product,
+            Customer = customer,
+            StartDate = DateTime.UtcNow.Date,
+            EndDate = DateTime.UtcNow.Date.AddMonths(12)
+        };
+        testDatabase.Context.WarrantyCards.Add(card);
+        await testDatabase.Context.SaveChangesAsync();
+        var controller = new WarrantyCardsController(testDatabase.Context);
+
+        var result = await controller.LookupBySerial(product.SerialNumber.ToLowerInvariant(), CancellationToken.None);
+
+        var response = Assert.IsType<WarrantyCardLookupResponse>(
+            Assert.IsType<OkObjectResult>(result.Result).Value);
+        Assert.Equal(product.SerialNumber, response.SerialNumber);
+        Assert.Null(typeof(WarrantyCardLookupResponse).GetProperty("CustomerName"));
+        Assert.Contains(
+            typeof(WarrantyCardsController)
+                .GetMethod(nameof(WarrantyCardsController.LookupBySerial))!
+                .GetCustomAttributes(typeof(AllowAnonymousAttribute), inherit: true),
+            attribute => attribute is AllowAnonymousAttribute);
+    }
+
+    [Fact]
+    public async Task ManagerCanReadAllCustomerWarrantyCards_AndCustomerOnlySeesOwn()
+    {
+        await using var testDatabase = await TestDatabase.CreateAsync();
+        var firstCustomer = NewUser("first@example.com", UserRole.Customer);
+        var secondCustomer = NewUser("second@example.com", UserRole.Customer);
+        var firstCard = new WarrantyCard
+        {
+            Product = NewProduct(),
+            Customer = firstCustomer,
+            StartDate = DateTime.UtcNow.Date,
+            EndDate = DateTime.UtcNow.Date.AddMonths(12)
+        };
+        var secondCard = new WarrantyCard
+        {
+            Product = NewProduct(),
+            Customer = secondCustomer,
+            StartDate = DateTime.UtcNow.Date,
+            EndDate = DateTime.UtcNow.Date.AddMonths(12)
+        };
+        testDatabase.Context.WarrantyCards.AddRange(firstCard, secondCard);
+        await testDatabase.Context.SaveChangesAsync();
+
+        var managerController = WithUser(
+            new WarrantyCardsController(testDatabase.Context), 1, UserRole.Manager);
+        var managerResult = await managerController.GetAll(
+            new QueryParameters(), null, CancellationToken.None);
+        var managerCards = Assert.IsType<PagedResult<WarrantyCardResponse>>(
+            Assert.IsType<OkObjectResult>(managerResult.Result).Value);
+        Assert.Equal(2, managerCards.TotalCount);
+
+        var customerController = WithUser(
+            new WarrantyCardsController(testDatabase.Context), firstCustomer.Id, UserRole.Customer);
+        var customerResult = await customerController.GetAll(
+            new QueryParameters(), null, CancellationToken.None);
+        var customerCards = Assert.IsType<PagedResult<WarrantyCardResponse>>(
+            Assert.IsType<OkObjectResult>(customerResult.Result).Value);
+        var ownCard = Assert.Single(customerCards.Items);
+        Assert.Equal(firstCard.Id, ownCard.Id);
     }
 
     [Fact]
@@ -366,15 +574,12 @@ public sealed class WarrantyApiTests
 
     private static TokenService CreateTokenService()
     {
-        var configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["Jwt:SigningKey"] = "this-is-a-test-signing-key-at-least-32-bytes",
-                ["Jwt:Issuer"] = "Warranty.Tests",
-                ["Jwt:Audience"] = "Warranty.Tests"
-            })
-            .Build();
-        return new TokenService(configuration);
+        return new TokenService(Microsoft.Extensions.Options.Options.Create(new JwtOptions
+        {
+            SigningKey = "this-is-a-test-signing-key-at-least-32-bytes",
+            Issuer = "Warranty.Tests",
+            Audience = "Warranty.Tests"
+        }));
     }
 
     private static TController WithUser<TController>(TController controller, int userId, UserRole role)

@@ -17,7 +17,7 @@ public class PaginationAndPolicyTests : IClassFixture<WebApplicationFactory<Prog
     {
         var res = await client.PostAsJsonAsync("/api/auth/login", new { email, password });
         res.EnsureSuccessStatusCode();
-        await using var doc = await JsonDocument.ParseAsync(await res.Content.ReadAsStreamAsync());
+        using var doc = await JsonDocument.ParseAsync(await res.Content.ReadAsStreamAsync());
         return doc.RootElement.GetProperty("accessToken").GetString()
             ?? doc.RootElement.GetProperty("AccessToken").GetString()
             ?? throw new InvalidOperationException("No accessToken");
