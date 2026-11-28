@@ -13,6 +13,7 @@ public static partial class DatabaseSeeder
         {
             await SeedExtendedAsync(dbContext);
             await SeedBulkDemoAsync(dbContext);
+            await SeedVietnameseDemoAsync(dbContext);
             return;
         }
 
@@ -324,6 +325,7 @@ public static partial class DatabaseSeeder
 
         await SeedExtendedAsync(dbContext);
         await SeedBulkDemoAsync(dbContext);
+        await SeedVietnameseDemoAsync(dbContext);
     }
 
     private static string GenerateRefreshTokenHash() =>

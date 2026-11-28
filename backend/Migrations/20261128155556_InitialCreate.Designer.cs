@@ -12,8 +12,8 @@ using Warranty.Data;
 namespace Warranty.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20261004175209_ModelComplete")]
-    partial class ModelComplete
+    [Migration("20261128155556_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)

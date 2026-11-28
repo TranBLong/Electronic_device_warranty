@@ -129,7 +129,7 @@ if (!app.Environment.IsDevelopment())
 
 app.UseCors("Frontend");
 app.UseAuthentication();
-app.UseMiddleware<ActiveUserMiddleware>();
+app.UseMiddleware<Warranty.Middlewares.ActiveUserMiddleware>();
 app.UseAuthorization();
 app.MapControllers();
 app.MapHealthChecks("/health");
